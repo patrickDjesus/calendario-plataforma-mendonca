@@ -22,7 +22,7 @@ export const OfflineIndicator: React.FC = () => {
   return (
     <div className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-2xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-xl animate-bounce">
       <WifiOff className="w-4 h-4" />
-      <span>Modo Offline — Seus dados e foco estão salvos localmente.</span>
+      <span>Sem internet — o que voce fizer agora nao da para salvar no Supabase.</span>
     </div>
   );
 };

@@ -53,7 +53,7 @@ export const SmartInputBar: React.FC<SmartInputBarProps> = ({
   return (
     <div className="w-full">
       <form onSubmit={handleSubmit} className="relative">
-        <div className="flex items-center gap-2.5 h-[52px] px-3.5 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--borda)] focus-within:border-[var(--primary)] focus-within:ring-1 focus-within:ring-[var(--primary)] transition-all">
+        <div data-gif-host className="flex items-center gap-2.5 h-[52px] px-3.5 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--borda)] focus-within:border-[var(--primary)] focus-within:ring-1 focus-within:ring-[var(--primary)] transition-all">
           <GifIcon name="nova-tarefa" className="w-7 h-7 shrink-0" />
 
           <input

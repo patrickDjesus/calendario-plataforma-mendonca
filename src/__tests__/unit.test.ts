@@ -7,6 +7,8 @@ import {
   calculateSM2 
 } from '../utils/xpSystem';
 import { parseNaturalLanguageTask } from '../utils/nlpParser';
+import { isHealthCategory, categoryGifName } from '../utils/taskCategory';
+import { DEFAULT_CATEGORIES } from '../services/repository';
 import { Task, Category } from '../types';
 
 describe('XP & Gamification System', () => {
@@ -159,5 +161,60 @@ describe('NLP Natural Language Parser', () => {
   it('routes math and physics keywords to unified study category', () => {
     const res = parseNaturalLanguageTask('Resolver 15 exercícios de matemática e física', categories, '2026-09-28');
     expect(res.categoryId).toBe('cat-estudo');
+  });
+});
+
+describe('Classificacao de tarefa por categoria', () => {
+  it('reconhece a categoria de saude padrao', () => {
+    expect(isHealthCategory({ id: 'cat-saude', name: 'Saúde & Treino', icon: 'heart-pulse' })).toBe(true);
+  });
+
+  it('reconhece categoria renomeada pelo usuario', () => {
+    expect(isHealthCategory({ id: 'cat-99', name: 'Saúde da mãe', icon: 'tag' })).toBe(true);
+    expect(isHealthCategory({ id: 'cat-98', name: 'Treino e Mobilidade', icon: 'tag' })).toBe(true);
+  });
+
+  it('reconhece pelo icone mesmo com nome enganoso', () => {
+    expect(isHealthCategory({ id: 'cat-97', name: 'Pessoal', icon: 'heart-pulse' })).toBe(true);
+  });
+
+  it('nao confunde outras categorias nem ausencia de categoria', () => {
+    expect(isHealthCategory({ id: 'cat-estudo', name: 'Estudo', icon: 'book' })).toBe(false);
+    expect(isHealthCategory({ id: 'cat-pessoal', name: 'Pessoal', icon: 'user' })).toBe(false);
+    expect(isHealthCategory({ id: 'cat-outro', name: 'Outro', icon: 'tag' })).toBe(false);
+    expect(isHealthCategory(null)).toBe(false);
+    expect(isHealthCategory(undefined)).toBe(false);
+  });
+});
+
+describe('Ilustracao animada por categoria', () => {
+  it('mapeia Pessoal e Outro para o asset proprio', () => {
+    expect(categoryGifName({ id: 'cat-pessoal', name: 'Pessoal' })).toBe('pessoal');
+    expect(categoryGifName({ id: 'cat-outro', name: 'Outro' })).toBe('outros');
+  });
+
+  it('reconhece categoria renomeada', () => {
+    expect(categoryGifName({ id: 'cat-77', name: 'Pessoal & Casa' })).toBe('pessoal');
+    expect(categoryGifName({ id: 'cat-78', name: 'Outros' })).toBe('outros');
+  });
+
+  it('deixa as demais categorias com o icone vetorial', () => {
+    expect(categoryGifName({ id: 'cat-estudo', name: 'Estudo' })).toBeNull();
+    expect(categoryGifName({ id: 'cat-trabalho', name: 'Trabalho' })).toBeNull();
+    expect(categoryGifName({ id: 'cat-saude', name: 'Saúde & Treino' })).toBeNull();
+    expect(categoryGifName({ id: 'cat-pessoal', name: 'Trabalho' })).toBe('pessoal');
+    expect(categoryGifName(null)).toBeNull();
+  });
+});
+
+describe('Categorias padrao', () => {
+  it('mantem a categoria de saude no rotulo curto', () => {
+    const saude = DEFAULT_CATEGORIES.find(c => c.id === 'cat-saude');
+    expect(saude?.name).toBe('Saúde');
+  });
+
+  it('a categoria de saude continua sendo reconhecida como saude', () => {
+    const saude = DEFAULT_CATEGORIES.find(c => c.id === 'cat-saude');
+    expect(saude && isHealthCategory(saude)).toBe(true);
   });
 });

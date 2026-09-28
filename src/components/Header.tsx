@@ -1,22 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import { 
   Play, 
   Pause, 
-  Search, 
-  HelpCircle, 
   ChevronDown,
-  Cloud,
-  CloudOff,
-  Loader,
 } from 'lucide-react';
 
-import { Task, Category, UserProfile } from '../types';
+import { Task, Category } from '../types';
 import { formatSecondsToDigital } from '../utils/dateUtils';
 import { CategoryIcon } from './CategoryIcon';
-import { GifIcon, GifName, ProfileAvatar } from './GifIcon';
+import { GifIcon, GifName } from './GifIcon';
 import { PWAInstallButton } from './PWAInstallButton';
 import { APP_NAME } from '../constants/app';
-import { cloudSync, SyncStatus } from '../services/supabase';
 
 interface HeaderProps {
   currentTab: string;
@@ -27,11 +22,6 @@ interface HeaderProps {
   onToggleActiveTimer: () => void;
   onStopActiveTimer: () => void;
   onOpenFullscreenFocus: () => void;
-  onOpenCommandPalette: () => void;
-  onOpenShortcuts: () => void;
-  onOpenSettings: () => void;
-  onOpenProfile: () => void;
-  profile: UserProfile;
   categories: Category[];
 }
 
@@ -44,25 +34,10 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleActiveTimer,
   onStopActiveTimer,
   onOpenFullscreenFocus,
-  onOpenCommandPalette,
-  onOpenShortcuts,
-  onOpenSettings,
-  onOpenProfile,
-  profile,
   categories,
 }) => {
   const [isTimerExpanded, setIsTimerExpanded] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(cloudSync.getStatus());
-
-  useEffect(() => cloudSync.onChange(setSyncStatus), []);
-
-  const syncMeta: Record<SyncStatus, { icon: typeof Cloud; cls: string; label: string }> = {
-    synced: { icon: Cloud, cls: 'text-emerald-500', label: 'Nuvem sincronizada' },
-    syncing: { icon: Loader, cls: 'text-[var(--primary)] animate-spin', label: 'Sincronizando...' },
-    offline: { icon: CloudOff, cls: 'text-slate-400', label: 'Offline — usando dados locais' },
-    error: { icon: Cloud, cls: 'text-rose-500', label: 'Erro na sincronização' },
-  };
-  const SyncIcon = syncMeta[syncStatus].icon;
+  const reduceMotion = useReducedMotion();
 
   const activeCategory = activeTask
     ? categories.find(c => c.id === activeTask.categoryId) || categories[0]
@@ -105,24 +80,31 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   key={item.id}
                   onClick={() => onSelectTab(item.id)}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer relative ${
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-colors cursor-pointer relative ${
                     isActive
-                      ? 'text-[var(--primary)] bg-[var(--primary-soft)]'
-                      : 'text-[var(--texto-suave)] hover:text-[var(--texto)] hover:bg-[var(--surface-secondary)]'
+                      ? 'text-[var(--primary)]'
+                      : 'text-[var(--texto-suave)] hover:text-[var(--texto)]'
                   }`}
                 >
-                  <GifIcon name={item.gif} className="w-6 h-6" playOnHover eager />
-                  <span>{item.label}</span>
                   {isActive && (
-                    <span className="absolute bottom-0 left-3 right-3 h-[3px] bg-[var(--primary)] rounded-full" />
+                    <motion.span
+                      layoutId="header-nav-active"
+                      transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }}
+                      className="absolute inset-0 rounded-xl bg-[var(--primary-soft)]"
+                    >
+                      <span className="absolute bottom-0 left-3 right-3 h-[3px] bg-[var(--primary)] rounded-full" />
+                    </motion.span>
                   )}
+                  <GifIcon name={item.gif} className="w-6 h-6 relative" playOnHover eager />
+                  <span className="relative">{item.label}</span>
                 </button>
               );
             })}
           </nav>
         </div>
 
-        {/* Right Actions: PWA Install, Active Timer, Search, Shortcuts, Settings, Avatar */}
+        {/* Right Actions: PWA Install & Active Timer */}
         <div className="flex items-center gap-2 sm:gap-2.5">
           
           {/* In-App PWA Install */}
@@ -161,7 +143,7 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Timer Dropdown Menu */}
               {isTimerExpanded && (
-                <div className="absolute right-0 mt-2 w-72 p-4 rounded-2xl bg-[var(--surface)] border border-[var(--borda)] shadow-xl z-50 animate-modal">
+                <div data-gif-host className="absolute right-0 mt-2 w-72 p-4 rounded-2xl bg-[var(--surface)] border border-[var(--borda)] shadow-xl z-50 animate-modal">
                   <div className="flex items-center gap-2.5 mb-2">
                     {activeCategory && <CategoryIcon category={activeCategory} size="sm" />}
                     <div className="min-w-0 flex-1">
@@ -200,56 +182,6 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
           )}
-
-          {/* Search Icon Button */}
-          <button
-            onClick={onOpenCommandPalette}
-            className="w-10 h-10 rounded-xl hover:bg-[var(--surface-secondary)] text-[var(--texto-suave)] hover:text-[var(--texto)] flex items-center justify-center transition-colors cursor-pointer"
-            title="Buscar ou comando (Ctrl+K)"
-            aria-label="Buscar"
-          >
-            <Search className="w-5 h-5" />
-          </button>
-
-          {/* Shortcuts Help Button */}
-          <button
-            onClick={onOpenShortcuts}
-            className="w-10 h-10 rounded-xl hover:bg-[var(--surface-secondary)] text-[var(--texto-suave)] hover:text-[var(--texto)] flex items-center justify-center transition-colors cursor-pointer"
-            title="Atalhos do teclado (?)"
-            aria-label="Atalhos"
-          >
-            <HelpCircle className="w-5 h-5" />
-          </button>
-
-          {/* Settings Button */}
-          <button
-            onClick={onOpenSettings}
-            className="w-10 h-10 rounded-xl hover:bg-[var(--surface-secondary)] text-[var(--texto-suave)] hover:text-[var(--texto)] flex items-center justify-center transition-colors cursor-pointer"
-            title="Configurações"
-            aria-label="Ajustes"
-          >
-            <GifIcon name="configuracao" className="w-6 h-6" playOnHover eager />
-          </button>
-
-          {/* Cloud Sync Status */}
-          <div
-            className={`w-10 h-10 rounded-xl hover:bg-[var(--surface-secondary)] flex items-center justify-center transition-colors cursor-default ${syncMeta[syncStatus].cls}`}
-            title={syncMeta[syncStatus].label}
-            role="status"
-            aria-label={syncMeta[syncStatus].label}
-          >
-            <SyncIcon className="w-4 h-4" />
-          </div>
-
-          {/* Avatar: ilustracao solta, sem fundo, borda ou sombra */}
-          <button
-            onClick={onOpenProfile}
-            className="w-11 h-11 flex items-center justify-center cursor-pointer hover:scale-105 transition-transform shrink-0 ml-1"
-            title={`Perfil de ${profile.name}`}
-            aria-label="Perfil"
-          >
-            <ProfileAvatar value="avatar-homem" className="w-full h-full" playOnHover eager />
-          </button>
 
         </div>
 

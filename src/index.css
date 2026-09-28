@@ -109,6 +109,19 @@
   animation: modalScale 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Leve aumento do card ao passar o mouse. Usar apenas nos cards do conteúdo
+   principal (Início, Tarefas, Semana, Jornada): header e sidebar ficam de fora
+   de propósito, assim como modais, drawers e avisos flutuantes. */
+.card-hover {
+  transition-property: transform, background-color, border-color, color, box-shadow, opacity;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card-hover:hover {
+  transform: scale(1.012);
+}
+
 /* Accessibility: prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
   *,

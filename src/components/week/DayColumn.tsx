@@ -143,6 +143,7 @@ export const DayColumn: React.FC<DayColumnProps> = ({
           return (
             <div
               key={task.id}
+              data-gif-host
               draggable
               onDragStart={(e) => {
                 e.dataTransfer.setData('text/plain', task.id);
@@ -150,7 +151,7 @@ export const DayColumn: React.FC<DayColumnProps> = ({
               }}
               onDragEnd={onDragEnd}
               onClick={() => onEditTask(task)}
-              className={`p-3 rounded-xl border transition-all cursor-pointer group text-left relative ${
+              className={`card-hover p-3 rounded-xl border transition-all cursor-pointer group text-left relative ${
                 task.completed
                   ? 'bg-[var(--surface-secondary)]/50 border-[var(--borda)] opacity-60'
                   : isRunning

@@ -178,7 +178,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
             if (dayTasks.length === 0) return null;
 
             return (
-              <div key={day.dateISO} className="bg-[var(--surface)] border border-[var(--borda)] rounded-2xl p-4 shadow-xs">
+              <div key={day.dateISO} className="card-hover bg-[var(--surface)] border border-[var(--borda)] rounded-2xl p-4 shadow-xs">
                 <div className="flex items-center justify-between border-b border-[var(--borda)] pb-2 mb-3">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-[var(--texto)]">
@@ -201,6 +201,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
                     return (
                       <div
                         key={task.id}
+                        data-gif-host
                         onClick={() => onEditTask(task)}
                         className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-secondary)] border border-[var(--borda)] hover:border-[var(--primary)] transition-all cursor-pointer"
                       >

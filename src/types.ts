@@ -154,6 +154,8 @@ export interface Task {
   recurringDays?: number[]; // 0 = Dom, 1 = Seg, ..., 6 = Sab
   recurringId?: string;
   reflectionNote?: string;
+  /** Choveu no dia e a tarefa ficou inviável (só faz sentido em tarefa de saúde). */
+  blockedByRain?: boolean;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -368,8 +370,6 @@ export interface PomodoroSettings {
   longBreakInterval: number;
   soundEnabled: boolean;
   vibrationEnabled: boolean;
-  ambientSound: 'none' | 'chuva' | 'ruido_branco' | 'ruido_marrom' | 'cafe' | 'binaural';
-  ambientVolume: number; // 0 to 1
 }
 
 export interface DashboardCardConfig {

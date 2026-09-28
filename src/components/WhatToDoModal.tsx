@@ -75,7 +75,7 @@ export const WhatToDoModal: React.FC<WhatToDoModalProps> = ({
             </div>
 
             {/* Task Highlight Card */}
-            <div className="p-5 rounded-[22px] bg-[var(--surface-secondary)] border border-[var(--borda)] flex items-start gap-4">
+            <div data-gif-host className="p-5 rounded-[22px] bg-[var(--surface-secondary)] border border-[var(--borda)] flex items-start gap-4">
               {category && <CategoryIcon category={category} size="md" />}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">

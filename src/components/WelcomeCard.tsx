@@ -1,7 +1,7 @@
 import React from 'react';
 import { UserProfile, StudyMode } from '../types';
 import { STUDY_MODES, calculateLevelFromXP, getLevelTitle } from '../utils/xpSystem';
-import { GifIcon, ProfileAvatar, StudyModeBadge } from './GifIcon';
+import { GifIcon, StudyModeBadge } from './GifIcon';
 
 interface WelcomeCardProps {
   profile: UserProfile;
@@ -28,7 +28,7 @@ export const WelcomeCard: React.FC<WelcomeCardProps> = ({
   });
 
   return (
-    <div className="w-full rounded-[24px] bg-[var(--surface)] p-5 sm:p-6 shadow-[var(--shadow-card)] relative overflow-hidden">
+    <div data-gif-host className="card-hover w-full rounded-[24px] bg-[var(--surface)] p-5 sm:p-6 shadow-[var(--shadow-card)] relative overflow-hidden">
       {/* Leve brilho sutil no canto */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
 
@@ -39,7 +39,7 @@ export const WelcomeCard: React.FC<WelcomeCardProps> = ({
           {/* Avatar solto (sem moldura/anel/sombra) + selo de nível sobreposto */}
           <div className="relative shrink-0" title={`${profile.name} - ${levelTitle}`}>
             <div className="w-[72px] h-[72px] sm:w-24 sm:h-24 flex items-center justify-center">
-              <ProfileAvatar value={profile.avatar} className="w-full h-full" />
+              <GifIcon name="foguete" className="w-full h-full" eager />
             </div>
             <span className="absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-md bg-slate-900 text-amber-300 text-xs font-black tracking-wider border border-slate-700">
               NV.{profile.level}
@@ -75,7 +75,7 @@ export const WelcomeCard: React.FC<WelcomeCardProps> = ({
           
           {/* Tile de Dias Estudados / Sequência */}
           <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--borda)] h-[66px]">
-            <GifIcon name="fogo-sequencia" className="w-11 h-11 shrink-0" />
+            <GifIcon name="fogo-sequencia" className="w-11 h-11 shrink-0" playOnHover={false} />
             <div>
               <div className="text-base font-extrabold text-[var(--texto)] tabular-nums leading-tight">
                 {profile.streak} {profile.streak === 1 ? 'dia' : 'dias'}
@@ -91,7 +91,7 @@ export const WelcomeCard: React.FC<WelcomeCardProps> = ({
             <div className="flex items-center justify-between gap-3 mb-1">
               <span className="text-xs font-bold text-[var(--texto-suave)]">Modo de estudo</span>
               <span className="text-xs font-semibold text-[var(--primary)]">
-                <StudyModeBadge badge={currentMode.badge} className="w-5 h-5" />
+                <StudyModeBadge badge={currentMode.badge} className="w-5 h-5 text-[15px]" animated={false} />
               </span>
             </div>
             <div className="flex items-center gap-1 bg-[var(--surface)] p-0.5 rounded-lg border border-[var(--borda)]">

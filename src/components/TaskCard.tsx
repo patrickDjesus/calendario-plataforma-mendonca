@@ -8,11 +8,13 @@ import {
   Star, 
   Pin, 
   Trash2, 
-  Edit3 
+  Edit3,
+  CloudRain
 } from 'lucide-react';
 import { Task, Category } from '../types';
 import { CategoryIcon } from './CategoryIcon';
 import { formatSecondsToDigital, formatMinutesHuman } from '../utils/dateUtils';
+import { isHealthCategory } from '../utils/taskCategory';
 
 interface TaskCardProps {
   task: Task;
@@ -27,6 +29,8 @@ interface TaskCardProps {
   onToggleTop3: (task: Task) => void;
   onTogglePin: (task: Task) => void;
   onToggleSubtask?: (taskId: string, subtaskId: string) => void;
+  /** Só chega para tarefas de saúde: marca que choveu e a tarefa ficou inviável. */
+  onToggleRain?: (task: Task) => void;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({
@@ -41,8 +45,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onDelete,
   onToggleTop3,
   onTogglePin,
+  onToggleRain,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
+
+  // Chuva só faz sentido em tarefa de saúde (corrida, treino, caminhada...).
+  const canMarkRain = Boolean(onToggleRain) && isHealthCategory(category);
+  const rainMarked = canMarkRain && Boolean(task.blockedByRain);
 
   const displaySeconds = isActiveTimer ? activeElapsedSeconds : task.spentSeconds;
   const estimatedSeconds = (task.estimatedMinutes || 0) * 60;
@@ -52,7 +61,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
   return (
     <div
-      className={`group relative py-3.5 px-3 rounded-2xl transition-all duration-150 flex items-center gap-4 ${
+      data-gif-host
+      className={`card-hover group relative py-3.5 px-3 rounded-2xl transition-all duration-150 flex items-center gap-4 ${
         isActiveTimer && isTimerRunning
           ? 'bg-[var(--primary-soft)] ring-1 ring-[var(--primary)]'
           : 'hover:bg-[var(--surface-secondary)]'
@@ -83,6 +93,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           {task.pinned && (
             <span className="flex items-center gap-1 text-xs font-bold text-[var(--primary)]">
               <Pin className="w-3 h-3 fill-current" />
+            </span>
+          )}
+
+          {rainMarked && (
+            <span className="flex items-center gap-1 text-xs font-bold text-sky-600">
+              <CloudRain className="w-3.5 h-3.5" />
+              Choveu
             </span>
           )}
 
@@ -147,6 +164,24 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             <Play className="w-4 h-4 fill-current ml-0.5" />
           )}
         </button>
+
+        {/* Chuva: impossibilitou a tarefa de saúde */}
+        {canMarkRain && (
+          <button
+            type="button"
+            onClick={() => onToggleRain?.(task)}
+            aria-pressed={rainMarked}
+            aria-label={rainMarked ? 'Remover marcação de chuva' : 'Marcar que choveu e não foi possível fazer'}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+              rainMarked
+                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/25'
+                : 'text-sky-500 hover:bg-sky-500/10 opacity-80 sm:opacity-0 group-hover:opacity-100'
+            }`}
+            title={rainMarked ? 'Choveu: remover marcação' : 'Choveu e não consegui fazer'}
+          >
+            <CloudRain className="w-4 h-4" />
+          </button>
+        )}
 
         {/* 24px Custom Checkbox */}
         <button

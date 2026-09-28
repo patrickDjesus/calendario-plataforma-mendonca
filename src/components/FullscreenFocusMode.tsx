@@ -1,18 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Play, 
   Pause, 
   Check, 
   X, 
-  Volume2, 
-  VolumeX, 
   Maximize2, 
   Minimize2, 
   RotateCcw, 
-  Waves, 
-  Wind, 
-  Headphones, 
-  Coffee,
   Sparkles, 
   Clock, 
   Repeat,
@@ -20,12 +14,10 @@ import {
   ShieldAlert,
   AlertCircle
 } from 'lucide-react';
-import { Task, Category, PomodoroSettings } from '../types';
+import { Task, Category } from '../types';
 import { formatSecondsToDigital, formatMinutesHuman } from '../utils/dateUtils';
-import { audioSynthesizer } from '../services/audioSynthesizer';
 import { repository } from '../services/repository';
 import { CategoryIcon } from './CategoryIcon';
-import { GifIcon } from './GifIcon';
 
 interface FullscreenFocusModeProps {
   isOpen: boolean;
@@ -36,8 +28,6 @@ interface FullscreenFocusModeProps {
   onToggleTimer: () => void;
   onCompleteTask: (task: Task, reflectionNote?: string, enableSpacedRepetition?: boolean) => void;
   category?: Category;
-  pomodoroSettings: PomodoroSettings;
-  onUpdatePomodoroSettings: (settings: PomodoroSettings) => void;
 }
 
 export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
@@ -49,8 +39,6 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
   onToggleTimer,
   onCompleteTask,
   category,
-  pomodoroSettings,
-  onUpdatePomodoroSettings,
 }) => {
   const [reflectionNote, setReflectionNote] = useState('');
   const [obstacleNote, setObstacleNote] = useState('');
@@ -61,39 +49,12 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
   const [examMode, setExamMode] = useState(false);
   const [pausesCount, setPausesCount] = useState(0);
 
-  const [selectedAmbient, setSelectedAmbient] = useState<PomodoroSettings['ambientSound']>(pomodoroSettings.ambientSound || 'none');
-  const [ambientVolume, setAmbientVolume] = useState(pomodoroSettings.ambientVolume ?? 0.5);
-
-  const lastExamChimeMinute = useRef(0);
-
   // Track pause count
   useEffect(() => {
     if (!activeTimerRunning && activeTimerElapsed > 0) {
       setPausesCount(prev => prev + 1);
     }
   }, [activeTimerRunning]);
-
-  // Exam Mode 30-min reminder
-  useEffect(() => {
-    if (examMode && activeTimerRunning) {
-      const elapsedMinutes = Math.floor(activeTimerElapsed / 60);
-      if (elapsedMinutes > 0 && elapsedMinutes % 30 === 0 && elapsedMinutes !== lastExamChimeMinute.current) {
-        lastExamChimeMinute.current = elapsedMinutes;
-        audioSynthesizer.playExamReminderChime();
-      }
-    }
-  }, [examMode, activeTimerRunning, activeTimerElapsed]);
-
-  // Ambient sound management
-  useEffect(() => {
-    if (isOpen) {
-      if (selectedAmbient !== 'none') {
-        audioSynthesizer.setAmbientSound(selectedAmbient as any, ambientVolume);
-      }
-    } else {
-      audioSynthesizer.stopAmbient();
-    }
-  }, [isOpen, selectedAmbient, ambientVolume]);
 
   if (!isOpen || !activeTask) return null;
 
@@ -104,25 +65,6 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
   const radius = 130;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
-
-  const handleAmbientChange = (type: 'none' | 'chuva' | 'ruido_branco' | 'ruido_marrom' | 'cafe' | 'binaural') => {
-    setSelectedAmbient(type);
-    audioSynthesizer.setAmbientSound(type, ambientVolume);
-    onUpdatePomodoroSettings({
-      ...pomodoroSettings,
-      ambientSound: type,
-      ambientVolume,
-    });
-  };
-
-  const handleVolumeChange = (vol: number) => {
-    setAmbientVolume(vol);
-    audioSynthesizer.setAmbientVolume(vol);
-    onUpdatePomodoroSettings({
-      ...pomodoroSettings,
-      ambientVolume: vol,
-    });
-  };
 
   const handleSaveDistraction = async () => {
     if (!distractionText.trim()) return;
@@ -167,10 +109,10 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
         }}
       />
 
-      {/* Top Header: Ambient Sound Controls & Actions */}
+      {/* Top Header: Categoria & Ferramentas */}
       <div className="relative z-10 flex items-center justify-between gap-4 max-w-5xl mx-auto w-full flex-wrap">
         {/* Category badge */}
-        <div className="flex items-center gap-3">
+        <div data-gif-host className="flex items-center gap-3">
           {category && <CategoryIcon category={category} size="sm" />}
           <div>
             <span className="text-xs font-black uppercase tracking-widest text-blue-600">
@@ -180,73 +122,6 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
               {activeTask.title}
             </h2>
           </div>
-        </div>
-
-        {/* Ambient Sound Bar */}
-        <div className="flex items-center gap-1.5 bg-white/85 backdrop-blur-md px-3 py-1.5 rounded-full border border-black/10 shadow-sm">
-          <button
-            onClick={() => handleAmbientChange('none')}
-            className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
-              selectedAmbient === 'none' ? 'bg-black/5 text-[#0F172A]' : 'text-slate-500 hover:text-[#0F172A]'
-            }`}
-            title="Silêncio"
-          >
-            Silêncio
-          </button>
-          <button
-            onClick={() => handleAmbientChange('chuva')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
-              selectedAmbient === 'chuva' ? 'bg-blue-500 text-white' : 'text-slate-500 hover:text-[#0F172A]'
-            }`}
-            title="Chuva relaxante"
-          >
-            <GifIcon name="dia-chuvoso" className="w-5 h-5" playOnHover blend={false} />
-            <span className="hidden sm:inline">Chuva</span>
-          </button>
-          <button
-            onClick={() => handleAmbientChange('cafe')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
-              selectedAmbient === 'cafe' ? 'bg-amber-700 text-white' : 'text-slate-500 hover:text-[#0F172A]'
-            }`}
-            title="Sons de cafeteria"
-          >
-            <Coffee className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Café</span>
-          </button>
-          <button
-            onClick={() => handleAmbientChange('ruido_marrom')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
-              selectedAmbient === 'ruido_marrom' ? 'bg-amber-600 text-white' : 'text-slate-500 hover:text-[#0F172A]'
-            }`}
-            title="Ruído marrom profundo"
-          >
-            <Waves className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Marrom</span>
-          </button>
-          <button
-            onClick={() => handleAmbientChange('binaural')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
-              selectedAmbient === 'binaural' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-[#0F172A]'
-            }`}
-            title="Ondas Alfa Binaurais (10Hz)"
-          >
-            <Headphones className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Alfa</span>
-          </button>
-
-          {/* Volume Slider */}
-          {selectedAmbient !== 'none' && (
-            <input
-              type="range"
-              min="0.05"
-              max="1"
-              step="0.05"
-              value={ambientVolume}
-              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-              className="w-16 accent-blue-500 h-1 bg-black/10 rounded-lg cursor-pointer ml-1"
-              title="Volume do som ambiente"
-            />
-          )}
         </div>
 
         {/* Right Tools: Anotar Distração & Modo Prova & Fechar */}
@@ -266,7 +141,7 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
           <button
             type="button"
             onClick={() => setExamMode(!examMode)}
-            title="Modo Prova (aviso a cada 30 min)"
+            title="Modo Prova"
             className={`h-9 px-3 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               examMode 
                 ? 'bg-rose-500 text-white shadow-xs' 

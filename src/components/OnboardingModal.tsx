@@ -48,7 +48,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
   const handleFinish = () => {
     onComplete(
-      name.trim() || 'Estudante',
+      name.trim() || 'Patrick',
       avatar,
       studyMode,
       selectedSubjects,
@@ -163,6 +163,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 return (
                   <div
                     key={mode}
+                    data-gif-host
                     onClick={() => setStudyMode(mode)}
                     className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between gap-4 ${
                       isSelected

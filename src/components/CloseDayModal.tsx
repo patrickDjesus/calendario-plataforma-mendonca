@@ -75,7 +75,7 @@ export const CloseDayModal: React.FC<CloseDayModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-modal">
-      <div className="w-full max-w-lg rounded-[24px] bg-[var(--surface)] p-6 sm:p-7 shadow-2xl border border-[var(--borda)] relative max-h-[90vh] overflow-y-auto">
+      <div data-gif-host className="w-full max-w-lg rounded-[24px] bg-[var(--surface)] p-6 sm:p-7 shadow-2xl border border-[var(--borda)] relative max-h-[90vh] overflow-y-auto">
         
         {/* Close Button */}
         <button

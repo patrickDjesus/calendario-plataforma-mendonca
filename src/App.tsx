@@ -12,7 +12,24 @@ import {
   WorkoutTemplate
 } from './types';
 import { repository, DEFAULT_CATEGORIES, generateUUID } from './services/repository';
+import {
+  cloudSync,
+  SyncKeyRequiredError,
+  CloudUnavailableError,
+  CloudDataCorruptedError,
+  type SyncStatus,
+} from './services/supabase';
+import { hasSyncKey, setSyncKey, clearSyncKey } from './services/syncKey';
 import { audioSynthesizer } from './services/audioSynthesizer';
+import { CloudOff, Loader2, AlertTriangle, X } from 'lucide-react';
+
+/** Fases da carga: sem nuvem nao ha app, entao isso e estado de verdade. */
+type BootState =
+  | { phase: 'loading' }
+  | { phase: 'needs-key' }
+  | { phase: 'offline'; detalhe: string }
+  | { phase: 'corrompido'; detalhe: string; userId: string }
+  | { phase: 'ready' };
 import { Header } from './components/Header';
 import { WelcomeCard } from './components/WelcomeCard';
 import { Sidebar } from './components/Sidebar';
@@ -31,6 +48,7 @@ import { WhatToDoModal } from './components/WhatToDoModal';
 import { PlanWeekModal } from './components/PlanWeekModal';
 import { TemplatesModal } from './components/TemplatesModal';
 import { OnboardingModal } from './components/OnboardingModal';
+import { SyncKeyGate } from './components/SyncKeyGate';
 import { RolloverBanner } from './components/RolloverBanner';
 import { CloseDayModal } from './components/CloseDayModal';
 import { InactivityPromptModal } from './components/InactivityPromptModal';
@@ -91,57 +109,145 @@ export default function App() {
 
   const todayISO = getTodayISO();
 
-  // Load initial database data
-  const loadInitialData = useCallback(async () => {
-    const [
-      loadedTasks,
-      loadedCats,
-      loadedProf,
-      loadedSettings,
-      loadedAchs,
-      loadedTemplates,
-      loadedWorkoutTpls,
-      loadedMoods,
-      loadedTrash,
-      loadedSpaced,
-    ] = await Promise.all([
-      repository.getTasks(),
-      repository.getCategories(),
-      repository.getProfile(),
-      repository.getSettings(),
-      repository.getAchievements(),
-      repository.getTemplates(),
-      repository.getWorkoutTemplates(),
-      repository.getAllMoods(),
-      repository.getTrash(),
-      repository.getSpacedRepetitions(),
-    ]);
+  // ==== BOOT: a nuvem e a fonte, entao a carga pode falhar de verdade ====
+  const [boot, setBoot] = useState<BootState>(
+    hasSyncKey() ? { phase: 'loading' } : { phase: 'needs-key' }
+  );
 
-    setTasks(loadedTasks);
-    setCategories(loadedCats);
-    setProfile(loadedProf);
-    setSettings(loadedSettings);
-    setAchievements(loadedAchs);
-    setTemplates(loadedTemplates);
-    setWorkoutTemplates(loadedWorkoutTpls);
-    setMoods(loadedMoods);
-    setTrash(loadedTrash);
-    setSpacedReps(loadedSpaced);
-
-    if (!loadedSettings.onboardingCompleted) {
-      setIsOnboardingOpen(true);
+  /** Falha de carga vira uma tela explicita — nunca um banco ficticio em silencio. */
+  const handleBootError = useCallback((err: unknown) => {
+    if (err instanceof SyncKeyRequiredError) {
+      setBoot({ phase: 'needs-key' });
+      return;
     }
+    if (err instanceof CloudDataCorruptedError) {
+      // Nao se resolve com "tentar de novo": so o painel do Supabase ve a linha.
+      setBoot({
+        phase: 'corrompido',
+        detalhe:
+          'Seu banco esta no Supabase, mas o conteudo dele chegou incompleto. ' +
+          'Nao vou abrir um banco vazio por cima disso e fingir que esta tudo bem.',
+        userId: err.userId,
+      });
+      return;
+    }
+    const detalhe = err instanceof CloudUnavailableError
+      ? 'Nao consegui falar com o Supabase. Sem ele nao existe onde salvar.'
+      : 'Erro inesperado ao carregar seu banco.';
+    setBoot({ phase: 'offline', detalhe });
   }, []);
 
+  const loadInitialData = useCallback(async () => {
+    try {
+      const [
+        loadedTasks,
+        loadedCats,
+        loadedProf,
+        loadedSettings,
+        loadedAchs,
+        loadedTemplates,
+        loadedWorkoutTpls,
+        loadedMoods,
+        loadedTrash,
+        loadedSpaced,
+      ] = await Promise.all([
+        repository.getTasks(),
+        repository.getCategories(),
+        repository.getProfile(),
+        repository.getSettings(),
+        repository.getAchievements(),
+        repository.getTemplates(),
+        repository.getWorkoutTemplates(),
+        repository.getAllMoods(),
+        repository.getTrash(),
+        repository.getSpacedRepetitions(),
+      ]);
+
+      setTasks(loadedTasks);
+      setCategories(loadedCats);
+      setProfile(loadedProf);
+      setSettings(loadedSettings);
+      setAchievements(loadedAchs);
+      setTemplates(loadedTemplates);
+      setWorkoutTemplates(loadedWorkoutTpls);
+      setMoods(loadedMoods);
+      setTrash(loadedTrash);
+      setSpacedReps(loadedSpaced);
+
+      setBoot({ phase: 'ready' });
+      // Banco nasceu vazio? A unica explicacao possivel e chave sem linha na
+      // nuvem. Dizer isso evita que o usuario conclua que perdeu os dados.
+      setAvisoBancoVazio(repository.getBootOrigin() === 'criado-do-zero');
+
+      if (!loadedSettings.onboardingCompleted) {
+        setIsOnboardingOpen(true);
+      }
+    } catch (err) {
+      handleBootError(err);
+    }
+  }, [handleBootError]);
+
   useEffect(() => {
-    loadInitialData();
+    loadInitialData().catch(handleBootError);
+  }, [loadInitialData, handleBootError]);
+
+  const handleConnectKey = useCallback(async (key: string) => {
+    setSyncKey(key);
+    repository.reset();
+    setBoot({ phase: 'loading' });
+    await loadInitialData();
   }, [loadInitialData]);
+
+  const handleRetryBoot = useCallback(() => {
+    repository.reset();
+    setBoot({ phase: 'loading' });
+    loadInitialData().catch(handleBootError);
+  }, [loadInitialData, handleBootError]);
+
+  // ==== AVISO DE "NAO SALVO" ====
+  // A nuvem e a fonte unica: se uma gravacao falhou, o usuario precisa ver isso
+  // em vez de acreditar que salvou. Volta a sumir sozinho na proxima que der certo.
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => cloudSync.getStatus());
+  const [avisoBancoVazio, setAvisoBancoVazio] = useState(false);
+  useEffect(() => cloudSync.onChange(setSyncStatus), []);
+
+  useEffect(() => {
+    const reenviar = () => { void repository.retryPendingSave(); };
+    window.addEventListener('online', reenviar);
+    return () => window.removeEventListener('online', reenviar);
+  }, []);
 
   // Toast notification helper
   const showToast = useCallback((msg: Omit<ToastMessage, 'id'>) => {
     const id = generateUUID();
     setToasts(prev => [...prev, { ...msg, id }]);
   }, []);
+
+  const handleRetrySave = useCallback(async () => {
+    const ok = await repository.retryPendingSave();
+    showToast({
+      text: ok
+        ? 'Salvo no Supabase.'
+        : 'Ainda nao consegui salvar. Voce esta sem internet?',
+      type: ok ? 'success' : 'warning',
+    });
+  }, [showToast]);
+
+  /** Volta para a tela da chave. O banco no Supabase nao e tocado. */
+  const handleTrocarChave = useCallback(() => {
+    repository.reset();
+    clearSyncKey();
+    setProfile(null);
+    setSettings(null);
+    setIsSettingsOpen(false);
+    setBoot({ phase: 'needs-key' });
+  }, []);
+
+  const handleDesconectar = useCallback(() => {
+    clearSyncKey();
+    handleTrocarChave();
+    showToast({ text: 'Chave apagada deste navegador. O banco no Supabase segue intacto.' });
+  }, [handleTrocarChave, showToast]);
 
   const handleDismissToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
@@ -394,6 +500,18 @@ export default function App() {
     if (selectedTaskForDrawer?.id === task.id) setSelectedTaskForDrawer(updated);
   }, [selectedTaskForDrawer]);
 
+  // Toggle "choveu": só faz sentido em tarefa de saúde
+  const handleToggleRain = useCallback(async (task: Task) => {
+    const updated = await repository.saveTask({ ...task, blockedByRain: !task.blockedByRain });
+    setTasks(prev => prev.map(t => t.id === task.id ? updated : t));
+    if (selectedTaskForDrawer?.id === task.id) setSelectedTaskForDrawer(updated);
+    showToast({
+      text: updated.blockedByRain
+        ? 'Chuva marcada: tarefa registrada como inviável hoje.'
+        : 'Marcação de chuva removida.'
+    });
+  }, [selectedTaskForDrawer, showToast]);
+
   // Move task date
   const handleMoveTaskDate = useCallback(async (taskId: string, newDate: string) => {
     const task = tasks.find(t => t.id === taskId);
@@ -586,7 +704,71 @@ export default function App() {
   }, [tasks, todayISO]);
 
 
-  if (!profile || !settings) {
+  if (boot.phase === 'needs-key') {
+    return <SyncKeyGate onConnect={handleConnectKey} />;
+  }
+
+  if (boot.phase === 'corrompido') {
+    return (
+      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-[var(--surface)] rounded-3xl border border-[var(--borda)] shadow-xl p-8">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
+            <AlertTriangle size={24} className="text-amber-500" />
+          </div>
+          <h1 className="text-lg font-black text-[var(--texto)] mb-2">Seu banco precisa de um olhar</h1>
+          <p className="text-sm text-[var(--texto-suave)] leading-relaxed mb-4">{boot.detalhe}</p>
+          <p className="text-xs text-[var(--texto-suave)] leading-relaxed mb-4">
+            Para olhar o conteudo, rode no painel do Supabase (SQL Editor):
+          </p>
+          <pre className="text-[11px] bg-[var(--surface-secondary)] border border-[var(--borda)] rounded-xl p-3 overflow-x-auto mb-4">
+{`select data
+from app_state
+where user_id = '${boot.userId}';`}
+          </pre>
+          <p className="text-xs text-[var(--texto-suave)] leading-relaxed mb-6">
+            Com o que estiver la em maos, use a exportacao/importacao JSON em Configuracoes
+            — ou apague essa linha se ela nao contiver nada que voce queira.
+          </p>
+          <button
+            type="button"
+            onClick={handleTrocarChave}
+            className="w-full py-3 rounded-2xl bg-[var(--primary)] text-white font-bold hover:opacity-90 transition-opacity cursor-pointer"
+          >
+            Voltar para a chave
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (boot.phase === 'offline') {
+    return (
+      <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-[var(--surface)] rounded-3xl border border-[var(--borda)] shadow-xl p-8 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+            <CloudOff size={24} className="text-red-500" />
+          </div>
+          <h1 className="text-lg font-black text-[var(--texto)] mb-2">Nao consegui abrir seu banco</h1>
+          <p className="text-sm text-[var(--texto-suave)] leading-relaxed mb-1">
+            {boot.detalhe}
+          </p>
+          <p className="text-xs text-[var(--texto-suave)] mb-6">
+            Seus dados estao no Supabase e continuam la. Nenhum banco ficticio foi
+            criado: o app so abre com o que a nuvem confirmar.
+          </p>
+          <button
+            type="button"
+            onClick={handleRetryBoot}
+            className="w-full py-3 rounded-2xl bg-[var(--primary)] text-white font-bold hover:opacity-90 transition-opacity cursor-pointer"
+          >
+            Tentar de novo
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (boot.phase === 'loading' || !profile || !settings) {
     return (
       <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-3 animate-pulse">
@@ -606,6 +788,51 @@ export default function App() {
       <ToastContainer toasts={toasts} onDismiss={handleDismissToast} />
       <MicroConfetti active={confettiActive} onDone={() => setConfettiActive(false)} />
       <OfflineIndicator />
+
+      {/* Gravacao recusada pela nuvem: o dado esta na tela mas NAO esta salvo. */}
+      {syncStatus === 'error' && (
+        <div className="sticky top-0 z-50 bg-red-600 text-white px-4 py-2 flex items-center justify-center gap-3 text-xs font-bold shadow-lg">
+          <CloudOff size={14} className="shrink-0" />
+          <span>Não consegui salvar no Supabase. O que você fez agora pode se perder.</span>
+          <button
+            type="button"
+            onClick={handleRetrySave}
+            className="shrink-0 underline underline-offset-2 hover:no-underline cursor-pointer"
+          >
+            Tentar de novo
+          </button>
+        </div>
+      )}
+      {avisoBancoVazio && (
+        <div className="sticky top-0 z-50 bg-amber-500 text-white px-4 py-2 flex items-center justify-center gap-3 text-xs font-bold shadow-lg">
+          <AlertTriangle size={14} className="shrink-0" />
+          <span className="text-left">
+            Este banco nasceu vazio: nao havia nada no Supabase para esta chave. Se voce
+            esperava ver seus dados, a chave pode estar errada.
+          </span>
+          <button
+            type="button"
+            onClick={handleTrocarChave}
+            className="shrink-0 underline underline-offset-2 hover:no-underline cursor-pointer"
+          >
+            Conferir a chave
+          </button>
+          <button
+            type="button"
+            onClick={() => setAvisoBancoVazio(false)}
+            aria-label="Dispensar aviso"
+            className="shrink-0 cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+      {syncStatus === 'syncing' && (
+        <div className="sticky top-0 z-50 bg-blue-600 text-white px-4 py-1.5 flex items-center justify-center gap-2 text-[11px] font-bold">
+          <Loader2 size={12} className="animate-spin" />
+          Salvando no Supabase...
+        </div>
+      )}
 
       {/* Floating Picture-in-Picture Mini Timer */}
       <FloatingMiniTimer
@@ -627,11 +854,6 @@ export default function App() {
         onToggleActiveTimer={handleToggleActiveTimer}
         onStopActiveTimer={handleToggleActiveTimer}
         onOpenFullscreenFocus={() => setIsFocusModeOpen(true)}
-        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-        onOpenShortcuts={() => setIsShortcutsOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenProfile={() => setIsSettingsOpen(true)}
-        profile={profile}
         categories={categories}
       />
 
@@ -710,6 +932,7 @@ export default function App() {
                 onToggleTop3={handleToggleTop3}
                 onTogglePin={handleTogglePin}
                 onToggleSubtask={handleToggleSubtask}
+                onToggleRain={handleToggleRain}
                 onAddTask={handleSaveTask}
                 onSelectTab={(tab) => setCurrentTab(tab as any)}
                 onSaveMood={handleSaveMood}
@@ -899,11 +1122,6 @@ export default function App() {
         onToggleTimer={handleToggleActiveTimer}
         onCompleteTask={handleToggleComplete}
         category={activeCategory}
-        pomodoroSettings={settings.pomodoro}
-        onUpdatePomodoroSettings={async (pom) => {
-          const updated = await repository.updateSettings({ pomodoro: pom });
-          setSettings(updated);
-        }}
       />
 
       {/* Command Palette (Ctrl+K) */}
@@ -1004,8 +1222,9 @@ export default function App() {
         onEmptyTrash={async () => {
           await repository.emptyTrash();
           setTrash([]);
-          showToast({ text: 'Lixeira esvaziada permanentemente.' });
         }}
+        onTrocarChave={handleTrocarChave}
+        onDesconectar={handleDesconectar}
       />
 
       {/* Keyboard Shortcuts Modal */}

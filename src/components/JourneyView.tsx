@@ -137,7 +137,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Streak card */}
-        <div className="p-5 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)] flex items-center gap-4">
+        <div data-gif-host className="card-hover p-5 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)] flex items-center gap-4">
           <GifIcon name="fogo-sequencia" className="w-14 h-14 shrink-0" />
           <div>
             <span className="text-2xl font-extrabold text-[var(--texto)] tabular-nums">
@@ -148,7 +148,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
         </div>
 
         {/* Total Focus Hours */}
-        <div className="p-5 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)] flex items-center gap-4">
+        <div data-gif-host className="card-hover p-5 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)] flex items-center gap-4">
           <GifIcon name="tempo-total-cronometrado" className="w-14 h-14 shrink-0" />
           <div>
             <span className="text-2xl font-extrabold text-[var(--texto)] tabular-nums">
@@ -159,7 +159,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
         </div>
 
         {/* Total XP */}
-        <div className="p-5 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)] flex items-center gap-4">
+        <div data-gif-host className="card-hover p-5 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)] flex items-center gap-4">
           <GifIcon name="experiencia-acumulada" className="w-14 h-14 shrink-0" />
           <div>
             <span className="text-2xl font-extrabold text-[var(--texto)] tabular-nums">
@@ -170,7 +170,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
         </div>
 
         {/* Completed Tasks */}
-        <div className="p-5 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)] flex items-center gap-4">
+        <div data-gif-host className="card-hover p-5 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)] flex items-center gap-4">
           <GifIcon name="tarefas-concluidas" className="w-14 h-14 shrink-0" />
           <div>
             <span className="text-2xl font-extrabold text-[var(--texto)] tabular-nums">
@@ -183,7 +183,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
       </div>
 
       {/* 365-Day Annual Heat Map */}
-      <div className="p-6 rounded-[28px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)]">
+      <div className="card-hover p-6 rounded-[28px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <div>
             <h3 className="text-lg font-extrabold text-[var(--texto)] tracking-tight">
@@ -248,7 +248,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* Category breakdown (7 cols) */}
-        <div className="lg:col-span-7 p-6 rounded-[28px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)]">
+        <div className="card-hover lg:col-span-7 p-6 rounded-[28px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)]">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-extrabold text-[var(--texto)] tracking-tight">
               Tempo Dedicado por Matéria / Categoria
@@ -263,7 +263,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
           ) : (
             <div className="space-y-4">
               {categoryStats.map(({ category, seconds, percentage }) => (
-                <div key={category.id} className="space-y-1.5">
+                <div key={category.id} data-gif-host className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs font-bold">
                     <div className="flex items-center gap-2">
                       <CategoryIcon category={category} size="sm" />
@@ -298,7 +298,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
         <div className="lg:col-span-5 space-y-4">
           
           {/* Calibrator Card */}
-          <div className="p-6 rounded-[28px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)]">
+          <div className="card-hover p-6 rounded-[28px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)]">
             <div className="flex items-center gap-2.5 text-xs font-extrabold uppercase tracking-wider text-[var(--primary)] mb-2">
               <TrendingUp className="w-4 h-4" />
               <span>Calibrador de Estimativas</span>
@@ -331,7 +331,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
           </div>
 
           {/* Weekly automated tip */}
-          <div className="p-6 rounded-[28px] bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-blue-500/10 border border-indigo-500/20 shadow-sm">
+          <div className="card-hover p-6 rounded-[28px] bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-blue-500/10 border border-indigo-500/20 shadow-sm">
             <div className="flex items-center gap-2 text-xs font-extrabold text-indigo-600 uppercase tracking-wider mb-2">
               <Zap className="w-4 h-4" />
               <span>Dica de Alta Performance</span>

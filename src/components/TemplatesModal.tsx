@@ -47,7 +47,7 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
-      <div className="w-full max-w-2xl rounded-[28px] bg-[var(--surface)] border border-[var(--borda)] shadow-2xl p-6 sm:p-7 text-[var(--texto)] my-8 animate-modal">
+      <div data-gif-host className="w-full max-w-2xl rounded-[28px] bg-[var(--surface)] border border-[var(--borda)] shadow-2xl p-6 sm:p-7 text-[var(--texto)] my-8 animate-modal">
         
         <div className="flex items-center justify-between pb-4 border-b border-[var(--borda)]">
           <div className="flex items-center gap-3">

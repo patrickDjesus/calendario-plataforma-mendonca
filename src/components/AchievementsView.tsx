@@ -87,7 +87,7 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
     <div className="space-y-6">
       
       {/* Level Header Banner */}
-      <div className="rounded-[28px] bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white p-7 sm:p-8 shadow-xl shadow-blue-500/20 relative overflow-hidden">
+      <div data-gif-host className="card-hover rounded-[28px] bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white p-7 sm:p-8 shadow-xl shadow-blue-500/20 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
@@ -134,7 +134,7 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
       </div>
 
       {/* Automatic Weekly Review Card */}
-      <div className="p-6 rounded-[28px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)]">
+      <div className="card-hover p-6 rounded-[28px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)]">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center font-bold">
@@ -194,7 +194,7 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
       </div>
 
       {/* Achievements Grid */}
-      <div className="p-6 rounded-[28px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)]">
+      <div className="card-hover p-6 rounded-[28px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)]">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-lg font-extrabold text-[var(--texto)] tracking-tight">
@@ -214,7 +214,7 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
             return (
               <div
                 key={ach.id}
-                className={`p-5 rounded-[22px] border transition-all duration-300 flex flex-col justify-between ${
+                className={`card-hover p-5 rounded-[22px] border transition-all duration-300 flex flex-col justify-between ${
                   isUnlocked
                     ? 'bg-[var(--surface)] border-amber-500/40 shadow-lg shadow-amber-500/10 ring-1 ring-amber-400/30'
                     : 'bg-[var(--surface-secondary)]/60 border-[var(--borda)] opacity-60'

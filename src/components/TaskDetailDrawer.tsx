@@ -54,6 +54,7 @@ import { generateUUID, repository } from '../services/repository';
 import { CategoryIcon } from './CategoryIcon';
 import { APP_NAME } from '../constants/app';
 import { audioSynthesizer } from '../services/audioSynthesizer';
+import { isHealthCategory as categoryIsHealth } from '../utils/taskCategory';
 
 interface TaskDetailDrawerProps {
   task: Task | null;
@@ -128,7 +129,7 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
   if (!isOpen || !currentTask) return null;
 
   const activeCategory = categories.find(c => c.id === currentTask.categoryId) || categories[0];
-  const isHealthCategory = activeCategory.id === 'cat-saude' || activeCategory.icon === 'heart-pulse' || activeCategory.name.toLowerCase().includes('saúde') || activeCategory.name.toLowerCase().includes('treino');
+  const isHealthCategory = categoryIsHealth(activeCategory);
   const isStudyCategory = activeCategory.icon === 'book' || activeCategory.icon === 'calculator' || activeCategory.icon === 'atom' || activeCategory.name.toLowerCase().includes('estudo') || activeCategory.name.toLowerCase().includes('matemática') || activeCategory.name.toLowerCase().includes('física');
 
   // Find curriculum structure for active category

@@ -12,10 +12,12 @@ import {
   Sparkles, 
   Bell, 
   Volume2, 
-  Calendar 
+  Calendar, 
+  KeyRound,
 } from 'lucide-react';
 import { Category, UserSettings, UserProfile, Task } from '../types';
 import { generateUUID } from '../services/repository';
+import { getSyncKey } from '../services/syncKey';
 import { CategoryIcon } from './CategoryIcon';
 
 interface SettingsModalProps {
@@ -34,6 +36,9 @@ interface SettingsModalProps {
   onResetDemo: () => void;
   onRestoreTrashTask: (id: string) => void;
   onEmptyTrash: () => void;
+  /** Leva de volta para a tela de chave (trocar ou reconectar). */
+  onTrocarChave: () => void;
+  onDesconectar: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -52,7 +57,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onResetDemo,
   onRestoreTrashTask,
   onEmptyTrash,
+  onTrocarChave,
+  onDesconectar,
 }) => {
+  const [mostrarChave, setMostrarChave] = useState(false);
   const [activeSection, setActiveSection] = useState<'geral' | 'materias' | 'pomodoro' | 'backup' | 'lixeira'>('geral');
   const [newCatName, setNewCatName] = useState('');
   const [newCatColor, setNewCatColor] = useState('#3B6CF5');
@@ -283,6 +291,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {categories.map((cat) => (
                     <div
                       key={cat.id}
+                      data-gif-host
                       className="p-3 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--borda)] flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2.5">
@@ -372,6 +381,66 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* SECTION: BACKUP & EXPORTACAO */}
           {activeSection === 'backup' && (
             <div className="space-y-4 animate-fadeIn">
+              {/* Chave de sincronização: é o que abre o banco no Supabase. */}
+              <div className="p-5 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--borda)] space-y-3">
+                <div className="flex items-start gap-2">
+                  <KeyRound size={16} className="text-[var(--primary)] mt-0.5 shrink-0" />
+                  <div>
+                    <div className="text-sm font-extrabold text-[var(--texto)]">Chave de sincronização</div>
+                    <div className="text-xs text-[var(--texto-suave)]">
+                      Seus dados ficam no Supabase, não neste navegador. A chave é o
+                      que abre o seu banco em qualquer dispositivo.
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-1 flex items-center gap-2 flex-wrap">
+                  <code className="px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--borda)] text-xs font-mono text-[var(--texto)]">
+                    {mostrarChave ? (getSyncKey() ?? '—') : '•'.repeat(12)}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => setMostrarChave(v => !v)}
+                    className="px-3 py-2 rounded-xl border border-[var(--borda)] text-xs font-bold text-[var(--texto-suave)] hover:text-[var(--texto)] transition-colors cursor-pointer"
+                  >
+                    {mostrarChave ? 'Ocultar' : 'Mostrar'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { void navigator.clipboard?.writeText(getSyncKey() ?? ''); }}
+                    className="px-3 py-2 rounded-xl border border-[var(--borda)] text-xs font-bold text-[var(--texto-suave)] hover:text-[var(--texto)] transition-colors cursor-pointer"
+                  >
+                    Copiar
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-[var(--texto-suave)] leading-relaxed">
+                  Guarde essa chave em um gerenciador de senhas. Ela não tem como ser
+                  recuperada pelo app: sem ela, a linha do seu banco fica inacessível.
+                </p>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={onTrocarChave}
+                    className="px-4 py-2.5 rounded-xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-bold shadow-md shadow-blue-500/20 cursor-pointer"
+                  >
+                    Trocar de chave
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onDesconectar}
+                    className="px-4 py-2.5 rounded-xl bg-[var(--surface)] hover:bg-[var(--borda)] border border-[var(--borda)] text-xs font-bold text-[var(--texto)] transition-colors cursor-pointer"
+                  >
+                    Desconectar neste dispositivo
+                  </button>
+                </div>
+                <p className="text-[11px] text-[var(--texto-suave)]">
+                  Desconectar só apaga a chave deste navegador. Nada é apagado no Supabase:
+                  basta digitar a mesma chave de novo para voltar ao mesmo banco.
+                </p>
+              </div>
+
               <div className="p-5 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--borda)] space-y-3">
                 <div>
                   <div className="text-sm font-extrabold text-[var(--texto)]">Exportar e Importar Backup (JSON)</div>

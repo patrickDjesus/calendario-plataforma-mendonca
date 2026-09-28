@@ -33,7 +33,9 @@ export const NowNextBar: React.FC<NowNextBarProps> = ({
   const isCurrentActive = !!activeTask;
 
   return (
-    <div className={`w-full rounded-[20px] p-4 sm:p-5 transition-all border ${
+    <div
+      data-gif-host
+      className={`card-hover w-full rounded-[20px] p-4 sm:p-5 transition-all border ${
       isCurrentActive
         ? 'bg-[var(--surface)] border-[var(--primary)] shadow-[var(--shadow-card)] ring-2 ring-[var(--primary)]/20'
         : 'bg-[var(--surface)] border-[var(--borda)] shadow-[var(--shadow-subtle)]'

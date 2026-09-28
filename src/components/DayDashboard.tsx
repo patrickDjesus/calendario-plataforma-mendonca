@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
   ArrowRight, 
-  CheckCircle2, 
-  Target
+  CheckCircle2
 } from 'lucide-react';
 import { Task, Category, UserProfile, UserSettings, DailyMood } from '../types';
 import { TaskCard } from './TaskCard';
@@ -29,6 +28,8 @@ interface DayDashboardProps {
   onToggleTop3: (task: Task) => void;
   onTogglePin: (task: Task) => void;
   onToggleSubtask: (taskId: string, subtaskId: string) => void;
+  /** Marca que choveu e a tarefa de saúde ficou inviável. */
+  onToggleRain?: (task: Task) => void;
   onAddTask: (data: any) => void;
   onSelectTab: (tab: string) => void;
   onSaveMood: (mood: 'otimo' | 'bom' | 'neutro' | 'cansado' | 'estressado', energy: number) => void;
@@ -52,6 +53,7 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
   onToggleTop3,
   onTogglePin,
   onToggleSubtask,
+  onToggleRain,
   onAddTask,
   onSelectTab,
   onSaveMood,
@@ -144,7 +146,7 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         
         {/* COLUNA 1: XP DIÁRIO (lg:col-span-4) */}
-        <div className="lg:col-span-4 rounded-[24px] bg-[var(--surface)] p-6 sm:p-7 shadow-[var(--shadow-card)] flex flex-col justify-between">
+        <div data-gif-host className="card-hover lg:col-span-4 rounded-[24px] bg-[var(--surface)] p-6 sm:p-7 shadow-[var(--shadow-card)] flex flex-col justify-between">
           <div>
             {/* Header com ícone e título */}
             <div className="flex items-center justify-between mb-4">
@@ -256,7 +258,7 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
         </div>
 
         {/* COLUNA 2: TAREFAS DO DIA (lg:col-span-5) */}
-        <div className="lg:col-span-5 rounded-[24px] bg-[var(--surface)] p-6 sm:p-7 shadow-[var(--shadow-card)] flex flex-col justify-between">
+        <div data-gif-host className="card-hover lg:col-span-5 rounded-[24px] bg-[var(--surface)] p-6 sm:p-7 shadow-[var(--shadow-card)] flex flex-col justify-between">
           <div>
             {/* Header: Título "Tarefas do dia" + Contador + Filtros segmentados */}
             <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
@@ -325,6 +327,7 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
                       onToggleTop3={onToggleTop3}
                       onTogglePin={onTogglePin}
                       onToggleSubtask={onToggleSubtask}
+                      onToggleRain={onToggleRain}
                     />
                   );
                 })
@@ -337,9 +340,9 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
         <div className="lg:col-span-3 space-y-6 flex flex-col justify-between">
           
           {/* Cartão METAS */}
-          <div className="rounded-[24px] bg-[var(--surface)] p-6 shadow-[var(--shadow-card)] flex-1">
+          <div data-gif-host className="card-hover rounded-[24px] bg-[var(--surface)] p-6 shadow-[var(--shadow-card)] flex-1">
             <div className="flex items-center gap-2 mb-5">
-              <Target className="w-5 h-5 text-[var(--primary)]" />
+              <GifIcon name="metas" className="w-8 h-8" />
               <h3 className="text-lg font-bold text-[var(--texto)]">Metas</h3>
             </div>
 

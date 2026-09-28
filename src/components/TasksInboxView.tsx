@@ -327,7 +327,7 @@ export const TasksInboxView: React.FC<TasksInboxViewProps> = ({
     <div className="space-y-5 animate-fadeIn">
       
       {/* Top Controls: Views & Search Bar */}
-      <div className="p-4 sm:p-5 rounded-[24px] bg-[var(--surface)] shadow-[var(--shadow-card)] space-y-4">
+      <div data-gif-host className="card-hover p-4 sm:p-5 rounded-[24px] bg-[var(--surface)] shadow-[var(--shadow-card)] space-y-4">
         
         {/* Header Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -478,7 +478,7 @@ export const TasksInboxView: React.FC<TasksInboxViewProps> = ({
             return (
               <div 
                 key={sectionKey} 
-                className="rounded-[20px] bg-[var(--surface)] border border-[var(--borda)] shadow-xs overflow-hidden"
+                className="card-hover rounded-[20px] bg-[var(--surface)] border border-[var(--borda)] shadow-xs overflow-hidden"
               >
                 {/* Section Header */}
                 <div 
@@ -530,6 +530,7 @@ export const TasksInboxView: React.FC<TasksInboxViewProps> = ({
                           return (
                             <div
                               key={task.id}
+                              data-gif-host
                               onClick={() => onSelectTaskToDrawer?.(task)}
                               className={`px-4 sm:px-5 py-3.5 sm:py-4 flex items-center justify-between gap-3 sm:gap-4 hover:bg-[var(--surface-secondary)]/50 transition-colors cursor-pointer group ${
                                 isSelected ? 'bg-[var(--primary-soft)]/50' : ''
@@ -693,7 +694,7 @@ export const TasksInboxView: React.FC<TasksInboxViewProps> = ({
           <div 
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleKanbanDrop(e, 'todo')}
-            className="p-4 rounded-[20px] bg-[var(--surface)] border border-[var(--borda)] shadow-xs flex flex-col min-h-[450px]"
+            className="card-hover p-4 rounded-[20px] bg-[var(--surface)] border border-[var(--borda)] shadow-xs flex flex-col min-h-[450px]"
           >
             <div className="flex items-center justify-between pb-3 border-b border-[var(--borda)] mb-3">
               <div className="flex items-center gap-2">
@@ -721,7 +722,7 @@ export const TasksInboxView: React.FC<TasksInboxViewProps> = ({
                     draggable
                     onDragStart={(e) => handleDragStart(e, task.id)}
                     onClick={() => onSelectTaskToDrawer?.(task)}
-                    className="p-3.5 sm:p-4 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--borda)] hover:border-[var(--primary)] transition-all cursor-grab active:cursor-grabbing space-y-2.5 shadow-2xs"
+                    className="card-hover p-3.5 sm:p-4 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--borda)] hover:border-[var(--primary)] transition-all cursor-grab active:cursor-grabbing space-y-2.5 shadow-2xs"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <span className="text-sm font-bold text-[var(--texto)] leading-snug">{task.title}</span>
@@ -740,7 +741,7 @@ export const TasksInboxView: React.FC<TasksInboxViewProps> = ({
           <div 
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleKanbanDrop(e, 'doing')}
-            className="p-4 rounded-[20px] bg-[var(--surface)] border border-[var(--primary)]/30 shadow-xs flex flex-col min-h-[450px]"
+            className="card-hover p-4 rounded-[20px] bg-[var(--surface)] border border-[var(--primary)]/30 shadow-xs flex flex-col min-h-[450px]"
           >
             <div className="flex items-center justify-between pb-3 border-b border-[var(--borda)] mb-3">
               <div className="flex items-center gap-2">
@@ -792,7 +793,7 @@ export const TasksInboxView: React.FC<TasksInboxViewProps> = ({
           <div 
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => handleKanbanDrop(e, 'done')}
-            className="p-4 rounded-[20px] bg-[var(--surface)] border border-[var(--borda)] shadow-xs flex flex-col min-h-[450px]"
+            className="card-hover p-4 rounded-[20px] bg-[var(--surface)] border border-[var(--borda)] shadow-xs flex flex-col min-h-[450px]"
           >
             <div className="flex items-center justify-between pb-3 border-b border-[var(--borda)] mb-3">
               <div className="flex items-center gap-2">
@@ -828,7 +829,7 @@ export const TasksInboxView: React.FC<TasksInboxViewProps> = ({
       {/* 3. CALENDAR OVERVIEW VIEW                                */}
       {/* ======================================================== */}
       {currentView === 'calendario' && (
-        <div className="p-6 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-xs text-center space-y-3">
+        <div className="card-hover p-6 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-xs text-center space-y-3">
           <CalendarDays className="w-8 h-8 text-[var(--primary)] mx-auto" />
           <h3 className="text-sm font-bold text-[var(--texto)]">Visão Semanal Integrada</h3>
           <p className="text-xs text-[var(--texto-suave)] max-w-md mx-auto">

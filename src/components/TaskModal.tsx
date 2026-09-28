@@ -20,6 +20,8 @@ import { Task, Category, Priority, Subtask } from '../types';
 import { generateUUID } from '../services/repository';
 import { getTodayISO } from '../utils/dateUtils';
 import { CategoryIcon } from './CategoryIcon';
+import { GifIcon } from './GifIcon';
+import { categoryGifName } from '../utils/taskCategory';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -334,22 +336,28 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               <label className="block text-xs font-semibold text-[var(--texto-suave)] mb-2">
                 Categoria
               </label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Categoria">
                 {categories.map((cat) => {
                   const isSelected = categoryId === cat.id;
+                  const gifName = categoryGifName(cat);
                   return (
                     <button
                       type="button"
                       key={cat.id}
+                      aria-pressed={isSelected}
                       onClick={() => setCategoryId(cat.id)}
-                      className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                      className={`inline-flex flex-col items-center justify-center gap-2 min-w-[100px] min-h-[104px] px-3 py-4 rounded-2xl text-xs font-semibold border transition-all cursor-pointer ${
                         isSelected
                           ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--texto)] ring-1 ring-[var(--primary)] shadow-xs font-bold'
                           : 'border-[var(--borda)] bg-[var(--surface-secondary)] text-[var(--texto-suave)] hover:text-[var(--texto)] hover:bg-[var(--surface)]'
                       }`}
                     >
-                      <CategoryIcon category={cat} size="sm" className="!w-5 !h-5 !rounded-md" />
-                      <span className="whitespace-normal leading-tight">{cat.name}</span>
+                      {gifName ? (
+                        <GifIcon name={gifName} className="w-9 h-9 shrink-0" alt="" />
+                      ) : (
+                        <CategoryIcon category={cat} size="md" className="!w-9 !h-9 !rounded-lg" />
+                      )}
+                      <span className="whitespace-normal leading-tight text-center">{cat.name}</span>
                     </button>
                   );
                 })}

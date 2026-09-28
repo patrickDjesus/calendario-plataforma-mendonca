@@ -132,6 +132,7 @@ export const PlanWeekModal: React.FC<PlanWeekModalProps> = ({
               return (
                 <div
                   key={task.id}
+                  data-gif-host
                   className="p-3.5 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--borda)] flex items-center justify-between gap-3"
                 >
                   <div className="flex items-center gap-3 min-w-0">

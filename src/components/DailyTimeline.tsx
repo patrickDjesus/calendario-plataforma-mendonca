@@ -97,7 +97,7 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
   };
 
   return (
-    <div className="rounded-[24px] bg-[var(--surface)] p-5 sm:p-6 shadow-[var(--shadow-card)] border border-[var(--borda)]">
+    <div className="card-hover rounded-[24px] bg-[var(--surface)] p-5 sm:p-6 shadow-[var(--shadow-card)] border border-[var(--borda)]">
       
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2 mb-3">

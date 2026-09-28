@@ -1,23 +1,24 @@
 /**
- * IndexedDB Storage Layer with Automatic Migrations, 7-day Rolling Backups,
- * and Inter-tab Broadcast Synchronization for FocoSemanal.
+ * IndexedDB: aviso de mudanca para as outras abas e a leitura da copia antiga.
+ *
+ * O banco em si NAO mora aqui — ele vive no Supabase (fonte unica). Este modulo
+ * nao guarda mais nenhum snapshot do banco: os backups-automaticos locais
+ * foram removidos porque eram uma copia completa dos dados no navegador, que e
+ * exatamente o que o usuario pediu para nao ter. O que sobrou e o que nao
+ * duplica dado:
+ *
+ *  - `app_state`: lido UMA vez, na importacao dos dados de antes da nuvem. Logo
+ *    depois de a nuvem confirmar, e apagado. Nada e escrito aqui de novo.
+ *  - undo: pilha em memoria (morre ao fechar a aba), nao persistida.
+ *  - `backups`: store removida. Quem quiser historico automatico precisa de uma
+ *    tabela no Supabase, que exige uma migration rodada no dashboard.
  */
 
 import { DatabaseSchema } from '../types';
 import { 
   IDB_NAME, 
-  STORAGE_KEY_V4, 
-  STORAGE_KEY_V5, 
   SYNC_CHANNEL_NAME 
 } from '../constants/app';
-
-export interface BackupSnapshot {
-  id: string;
-  timestamp: string; // ISO
-  dateStr: string;   // YYYY-MM-DD
-  reason: string;
-  data: DatabaseSchema;
-}
 
 export interface UndoEntry {
   id: string;
@@ -74,16 +75,20 @@ class IndexedDBManager {
         return;
       }
 
-      const request = indexedDB.open(IDB_NAME, 1);
+      // v2 descarta a store `backups`: as copiasautomaticas locais foram
+      // removidas e o que nelas estava e redundante com o que ja esta na nuvem.
+      // A store `app_state` e preservada de proposito — e dela que sai a
+      // importacao, e destrui-la aqui apagaria os dados de quem ainda nao
+      // digitou a chave.
+      const request = indexedDB.open(IDB_NAME, 2);
 
-      request.onupgradeneeded = (e) => {
+      request.onupgradeneeded = () => {
         const db = request.result;
         if (!db.objectStoreNames.contains('app_state')) {
           db.createObjectStore('app_state');
         }
-        if (!db.objectStoreNames.contains('backups')) {
-          const backupStore = db.createObjectStore('backups', { keyPath: 'id' });
-          backupStore.createIndex('timestamp', 'timestamp', { unique: false });
+        if (db.objectStoreNames.contains('backups')) {
+          db.deleteObjectStore('backups');
         }
       };
 
@@ -100,158 +105,56 @@ class IndexedDBManager {
   }
 
   /**
-   * Load current database state from IndexedDB with fallback to localStorage
+   * Le a copia local antiga do banco, que sobrou de antes de o Supabase virar
+   * a fonte unica. So e chamada uma vez, na importacao. Depois disso o app
+   * nunca mais persiste o banco aqui.
    */
-  public async loadState(): Promise<DatabaseSchema | null> {
+  public async loadLegacyState(): Promise<DatabaseSchema | null> {
     try {
       const db = await this.openDB();
       const tx = db.transaction('app_state', 'readonly');
       const store = tx.objectStore('app_state');
-
-      const data = await new Promise<DatabaseSchema | null>((resolve, reject) => {
+      return await new Promise<DatabaseSchema | null>((resolve, reject) => {
         const req = store.get('current');
         req.onsuccess = () => resolve(req.result || null);
         req.onerror = () => reject(req.error);
       });
-
-      if (data) return data;
     } catch (e) {
-      console.warn('IndexedDB read failed, falling back to localStorage:', e);
+      console.warn('IndexedDB read failed:', e);
+      return null;
     }
-
-    // Fallback: check localStorage (v5 then v4)
-    if (typeof localStorage !== 'undefined') {
-      try {
-        const rawV5 = localStorage.getItem(STORAGE_KEY_V5);
-        if (rawV5) return JSON.parse(rawV5);
-
-        const rawV4 = localStorage.getItem(STORAGE_KEY_V4);
-        if (rawV4) return JSON.parse(rawV4);
-      } catch (err) {
-        console.error('LocalStorage parse error:', err);
-      }
-    }
-
-    return null;
   }
 
   /**
-   * Save database state to IndexedDB and mirror to localStorage
+   * Apaga a copia local antiga do banco. Chamada uma unica vez, depois que a
+   * nuvem ja confirmou a importacao: enquanto ela nao confirmar, esta copia e
+   * a unica rede de seguranca que existe.
    */
-  public async saveState(data: DatabaseSchema): Promise<void> {
-    // 1. Mirror in localStorage for instant synchronous fallback
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem(STORAGE_KEY_V5, JSON.stringify(data));
-      } catch (e) {
-        console.warn('LocalStorage save error (likely quota exceeded):', e);
-      }
-    }
-
-    // 2. Persist in IndexedDB
+  public async deleteLegacyState(): Promise<void> {
     try {
       const db = await this.openDB();
+      if (!db.objectStoreNames.contains('app_state')) return;
       const tx = db.transaction('app_state', 'readwrite');
-      const store = tx.objectStore('app_state');
-      store.put(data, 'current');
-
+      tx.objectStore('app_state').delete('current');
       await new Promise<void>((resolve, reject) => {
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
       });
     } catch (e) {
-      console.warn('IndexedDB write error:', e);
+      console.warn('Nao foi possivel apagar a copia local antiga:', e);
     }
-
-    // 3. Broadcast to other open tabs
-    this.broadcast(data);
-
-    // 4. Trigger rolling backup check in background
-    this.checkDailyRollingBackup(data).catch(() => {});
   }
 
   /**
-   * Automatic rolling backup: retains up to 7 snapshots
+   * Confirma que o estado foi salvo — na nuvem, que e onde ele mora.
+   *
+   * Aqui nao se grava nada: o espelho em localStorage foi removido, o
+   * IndexedDB nao recebe mais o snapshot do dia, e o que sobra e avisar as
+   * outras abas abertas que o estado delas ficou velho.
    */
-  public async checkDailyRollingBackup(currentData: DatabaseSchema): Promise<void> {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const backups = await this.getBackups();
-
-      // Check if we already have a backup for today
-      const hasToday = backups.some(b => b.dateStr === today);
-      if (!hasToday) {
-        await this.createBackup(currentData, `Backup diário automático (${today})`);
-      }
-    } catch (e) {
-      console.warn('Rolling backup error:', e);
-    }
-  }
-
-  public async createBackup(data: DatabaseSchema, reason: string): Promise<string> {
-    const id = `backup-${Date.now()}`;
-    const snapshot: BackupSnapshot = {
-      id,
-      timestamp: new Date().toISOString(),
-      dateStr: new Date().toISOString().split('T')[0],
-      reason,
-      data: JSON.parse(JSON.stringify(data)),
-    };
-
-    try {
-      const db = await this.openDB();
-      const tx = db.transaction('backups', 'readwrite');
-      const store = tx.objectStore('backups');
-      store.put(snapshot);
-
-      await new Promise<void>((resolve, reject) => {
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-
-      // Prune backups beyond the 7 most recent
-      await this.pruneBackups();
-    } catch (e) {
-      console.warn('Failed to store backup snapshot:', e);
-    }
-
-    return id;
-  }
-
-  public async getBackups(): Promise<BackupSnapshot[]> {
-    try {
-      const db = await this.openDB();
-      const tx = db.transaction('backups', 'readonly');
-      const store = tx.objectStore('backups');
-
-      return await new Promise<BackupSnapshot[]>((resolve, reject) => {
-        const req = store.getAll();
-        req.onsuccess = () => {
-          const list = (req.result || []) as BackupSnapshot[];
-          list.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-          resolve(list);
-        };
-        req.onerror = () => reject(req.error);
-      });
-    } catch (e) {
-      console.warn('Failed to get backups:', e);
-      return [];
-    }
-  }
-
-  private async pruneBackups(): Promise<void> {
-    try {
-      const backups = await this.getBackups();
-      if (backups.length > 7) {
-        const toDelete = backups.slice(7);
-        const db = await this.openDB();
-        const tx = db.transaction('backups', 'readwrite');
-        const store = tx.objectStore('backups');
-        toDelete.forEach(b => store.delete(b.id));
-      }
-    } catch (e) {
-      console.warn('Failed to prune backups:', e);
-    }
+  public notifySaved(data: DatabaseSchema): void {
+    this.broadcast(data);
   }
 
   // ==== UNDO STACK ====

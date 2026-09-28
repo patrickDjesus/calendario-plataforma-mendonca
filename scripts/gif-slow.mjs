@@ -1,7 +1,7 @@
 /**
- * Desacelera GIFs sem re-encode, multiplicando o field "delay" (centessimos
- * de segundo) de cada Graphic Control Extension. Só 2 bytes por frame mudam:
- * LZW, paleta, alfa e tamanho permanecem intactos.
+ * Acelera/desacelera GIFs sem re-encode, multiplicando o field "delay"
+ * (centessimos de segundo) de cada Graphic Control Extension. Só 2 bytes por
+ * frame mudam: LZW, paleta, alfa e tamanho permanecem intactos.
  *
  * Uso:  node scripts/gif-slow.mjs
  *
@@ -17,28 +17,24 @@ const ROOT = process.cwd();
 const GIF_DIR = path.join(ROOT, 'public', 'gifs');
 const MANIFEST = path.join(ROOT, 'scripts', 'gif-delays.orig.json');
 
-/** Fator de desaceleracao (aplicado a TODOS os frames do asset). */
-const FACTOR = 2;
+/**
+ * Fator de velocidade (multiplicado em TODOS os frames do asset). 0.5 = 2x mais
+ * rapido. 0.8 = 1.25x mais rapido, que e o ritmo atual: bem mais vivo que o
+ * original, sem carregar o GIF ate o corte de animacao.
+ */
+const FACTOR = 0.8;
 
 /**
- * Assets que ficam sempre animados (Jornada, Dashboard, modais, avatares).
- * Os de hover exclusivo (inicio, jornada, modo-foco, revisao-espacada,
- * semana, lixeira, configuracao, dia-chuvoso) ficam no ritmo original.
+ * Piso do atraso. Navegadores tratam delay 0 ou 1 como 10 centessimos (100ms),
+ * ou seja, um frame "acelerado" demais vira um frame lento de 100ms. 2cs
+ * (20ms) e o menor valor que o formato entrega de verdade.
+ * So vale ao ACELERAR: com FACTOR >= 1 o arquivo original e devolvido byte a
+ * byte, sem piso algum.
  */
-const SLOWED = new Set([
-  'avatar-homem.gif',
-  'avatar-mulher.gif',
-  'experiencia-acumulada.gif',
-  'finalizar-dia.gif',
-  'fogo-sequencia.gif',
-  'modelos-rotina.gif',
-  'nova-tarefa.gif',
-  'tarefa-estudo.gif',
-  'tarefa-saude.gif',
-  'tarefa-trabalho.gif',
-  'tarefas.gif',
-  'tarefas-concluidas.gif',
-  'tempo-total-cronometrado.gif',
+const MIN_DELAY_CS = 2;
+
+/** Assets que ficam no ritmo original, fora do FACTOR. Vazio = todos aceleram. */
+const KEEP = new Set([
 ]);
 
 /** Caminha pela estrutura do GIF chamando onGce(offsetDoDelay, delayAtual). */
@@ -161,9 +157,12 @@ for (const file of gifs) {
     throw new Error(`${file}: numero de frames mudou (${entries.length} vs ${pristine.length})`);
   }
 
-  const isSlowed = SLOWED.has(file);
-  const target = entries.map((e, i) => (isSlowed ? pristine[i] * FACTOR : pristine[i]));
-  const clamped = target.map((t) => Math.min(65535, Math.max(1, t)));
+  const isKept = KEEP.has(file);
+  const floor = FACTOR < 1 ? MIN_DELAY_CS : 1;
+  const target = entries.map((e, i) =>
+    isKept ? pristine[i] : Math.max(floor, Math.round(pristine[i] * FACTOR))
+  );
+  const clamped = target.map((t) => Math.min(65535, Math.max(floor, t)));
 
   if (!clamped.every((t, i) => t === entries[i].d)) {
     const out = Buffer.from(original);
@@ -183,13 +182,17 @@ for (const file of gifs) {
     changed++;
   }
 
-  const before = sum(isSlowed ? clamped.map((_, i) => pristine[i]) : pristine);
+  const before = sum(pristine);
   const now = sum(clamped);
   console.log(
-    `${file.padEnd(28)} frames=${String(entries.length).padStart(4)}  ${isSlowed ? '2x ' : '1x '}` +
-    `loop ${before.toFixed(2).padStart(6)}s -> ${now.toFixed(2).padStart(6)}s`
+    `${file.padEnd(28)} frames=${String(entries.length).padStart(4)}  ` +
+      `${isKept ? '1x  ' : FACTOR + 'x '}loop ${before.toFixed(2).padStart(6)}s -> ${now.toFixed(2).padStart(6)}s` +
+      `  (${(before / now).toFixed(2)}x mais rapido)`
   );
 }
 
-console.log(`\n${changed}/${gifs.length} arquivos alterados (fator ${FACTOR}x nos ${SLOWED.size} continuos).`);
+console.log(
+  `\n${changed}/${gifs.length} arquivos alterados (fator ${FACTOR}x, piso ${MIN_DELAY_CS}cs, ` +
+    `${KEEP.size} no ritmo original).`
+);
 if (changed === 0) console.log('Nada a fazer: atrasos ja estao no fator desejado.');

@@ -35,14 +35,20 @@ import {
   STORAGE_KEY_V4 
 } from '../constants/app';
 import { idbManager } from './db';
-import { cloudSync } from './supabase';
+import { cloudSync, SyncKeyRequiredError, CloudDataCorruptedError, isDatabaseShape } from './supabase';
+import {
+  getSyncKey,
+  userIdFromSyncKey,
+  getLegacyDeviceId,
+  clearLegacyDeviceId,
+} from './syncKey';
 import { calculateSM2 } from '../utils/xpSystem';
 
 export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'cat-estudo', name: 'Estudo', color: '#3B6CF5', icon: 'book' },
   { id: 'cat-trabalho', name: 'Trabalho', color: '#10B981', icon: 'briefcase' },
   { id: 'cat-pessoal', name: 'Pessoal', color: '#EC4899', icon: 'user' },
-  { id: 'cat-saude', name: 'Saúde & Treino', color: '#F97316', icon: 'heart-pulse' },
+  { id: 'cat-saude', name: 'Saúde', color: '#F97316', icon: 'heart-pulse' },
   { id: 'cat-outro', name: 'Outro', color: '#64748B', icon: 'tag' },
 ];
 
@@ -268,12 +274,58 @@ function getTodayString(): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Quando o usuario mexeu por ultimo num snapshot.
+ *
+ * A versao antiga do app engolia o erro do push: era possivel alterar algo no
+ * navegador e a nuvem nunca receber. Por isso a copia local pode estar A FRENTE
+ * da nuvem, e nao atras. Como nenhuma das duas guarda um rev confiavel para
+ * comparar, o desempate e pela atividade mais recente.
+ *
+ * `profile.createdAt` de proposito nao entra: e o mesmo instante em todas as
+ * copias e, sendo o maior valor da lista, esconderia justamente a diferenca que
+ * importa.
+ */
+/** Quanto conteudo uma copia carrega. No empate de recencia, vence a mais cheia. */
+function contentCount(db: DatabaseSchema): number {
+  return (
+    (db.tasks?.length ?? 0) +
+    (db.trash?.length ?? 0) +
+    (db.spacedRepetitions?.length ?? 0) +
+    (db.errorLogs?.length ?? 0) +
+    (db.distractionNotes?.length ?? 0) +
+    (db.focusSummaries?.length ?? 0) +
+    (db.bodyMeasurements?.length ?? 0) +
+    (db.flashcards?.length ?? 0)
+  );
+}
+
+function freshnessOf(db: DatabaseSchema): number {
+  let newest = 0;
+  const consider = (iso?: string) => {
+    if (!iso) return;
+    const t = Date.parse(iso);
+    if (Number.isFinite(t) && t > newest) newest = t;
+  };
+  consider(db.profile?.lastActiveDate);
+  db.tasks?.forEach(t => {
+    consider(t.updatedAt);
+    consider(t.createdAt);
+    consider(t.completedAt);
+  });
+  db.trash?.forEach(t => {
+    consider(t.updatedAt);
+    consider(t.originalDeletedAt);
+  });
+  return newest;
+}
+
 export function createInitialDatabase(): DatabaseSchema {
   const today = getTodayString();
   return {
     version: DB_VERSION,
     profile: {
-      name: 'Estudante',
+      name: 'Patrick',
       avatar: '🚀',
       studyMode: 'regular',
       level: 1,
@@ -313,8 +365,6 @@ export function createInitialDatabase(): DatabaseSchema {
         longBreakInterval: 4,
         soundEnabled: true,
         vibrationEnabled: true,
-        ambientSound: 'none',
-        ambientVolume: 0.5,
       },
     },
     categories: DEFAULT_CATEGORIES,
@@ -406,6 +456,12 @@ export function migrateDatabase(parsed: DatabaseSchema): DatabaseSchema {
   if (typeof parsed.profile.streakShieldAvailable === 'undefined') {
     parsed.profile.streakShieldAvailable = true;
   }
+  // Nome padrao antigo: so quando o app ainda guarda o placeholder intacto ele
+  // vira o nome do dono. Quem digitou o proprio nome fica como digitou.
+  if (parsed.profile.name === 'Estudante') {
+    parsed.profile.name = 'Patrick';
+  }
+
   if (!parsed.settings.fontSize) {
     parsed.settings.fontSize = 'md';
   }
@@ -424,6 +480,14 @@ export function migrateDatabase(parsed: DatabaseSchema): DatabaseSchema {
   if (!parsed.exercisePRs) parsed.exercisePRs = {};
   if (!parsed.distractionNotes) parsed.distractionNotes = [];
   if (!parsed.focusSummaries) parsed.focusSummaries = [];
+
+  // A categoria padrao de saude perdeu o "& Treino". So o rotulo antigo e
+  // renomeado: quem criou a propria categoria com outro nome fica intacto.
+  if (parsed.categories) {
+    parsed.categories = parsed.categories.map(c =>
+      c.id === 'cat-saude' && c.name.trim() === 'Saúde & Treino' ? { ...c, name: 'Saúde' } : c
+    );
+  }
 
   // Migrate standalone categories to cat-estudo
   if (parsed.categories && parsed.categories.length > 0) {
@@ -458,110 +522,209 @@ export function migrateDatabase(parsed: DatabaseSchema): DatabaseSchema {
 class DataRepository {
   private inMemoryDb: DatabaseSchema | null = null;
   private initPromise: Promise<DatabaseSchema> | null = null;
-  private cloudPushTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Ultimo erro de gravacao na nuvem, para a interface poder avisar. */
+  private lastSaveError: unknown = null;
+  /** De onde veio o banco que esta aberto, para a interface poder avisar. */
+  private bootOrigin: 'nenhuma' | 'da-nuvem' | 'importado' | 'criado-do-zero' = 'nenhuma';
 
   constructor() {
-    // Listen for tab sync
+    // Sincroniza abas abertas: depois de salvar na nuvem, as outras abas
+    // reidratam do mesmo estado. Nao envolve persistencia local.
     idbManager.onSync((syncedDb) => {
       this.inMemoryDb = syncedDb;
     });
   }
 
+  /**
+   * Zera o estado de carga para permitir tentar de novo depois de uma falha
+   * (sem internet, por exemplo). Sem isso a promise rejeitada de initialize()
+   * ficaria presa e o botao "Tentar novamente" nao faria nada.
+   */
+  public reset(): void {
+    this.inMemoryDb = null;
+    this.initPromise = null;
+    this.lastSaveError = null;
+    this.bootOrigin = 'nenhuma';
+  }
+
+  /**
+   * De onde veio o banco aberto. `criado-do-zero` e o caso perigoso: o app
+   * nasceu vazio porque nao achou linha nenhuma, e sem isso a unica pista de
+   * que a chave pode estar errada e o usuario ver um app sem os dados dele.
+   */
+  public getBootOrigin(): typeof this.bootOrigin {
+    return this.bootOrigin;
+  }
+
+  /** Reenvia para a nuvem o que ficou pendente de uma gravacao que falhou. */
+  public async retryPendingSave(): Promise<boolean> {
+    const ok = await cloudSync.retry();
+    // Sem isso o ultimo erro continuaria "presente" depois de salvar, e a
+    // interface mostraria um aviso de dados perdidos que ja nao sao.
+    if (ok) this.lastSaveError = null;
+    return ok;
+  }
+
+  /** Erro da ultima gravacao que a nuvem recusou (null se tudo certo). */
+  public getLastSaveError(): unknown {
+    return this.lastSaveError;
+  }
+
+  /**
+   * Carga inicial. A nuvem e a fonte: se a linha da chave existe, ela decide
+   * o que o app mostra; se nao existe, nasce um banco novo e ele e enviado.
+   *
+   * Lanca SyncKeyRequiredError sem chave e CloudUnavailableError sem rede —
+   * nesse caso o app nao abre com um banco ficticio, que era como se perdia
+   * alteracao sem o usuario perceber.
+   */
   public async initialize(): Promise<DatabaseSchema> {
     if (this.inMemoryDb) return this.inMemoryDb;
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
-      try {
-        const fromIdb = await idbManager.loadState();
-        if (fromIdb) {
-          const migrated = migrateDatabase(fromIdb);
-          this.inMemoryDb = migrated;
-          await idbManager.saveState(migrated);
-          return await this.reconcileWithCloud(migrated);
-        }
+      const key = getSyncKey();
+      if (!key) throw new SyncKeyRequiredError();
+      cloudSync.setUser(userIdFromSyncKey(key));
 
-        // Check localStorage migration
-        const stored = this.loadFromLocalStorageFallback();
-        if (stored) {
-          const migrated = migrateDatabase(stored);
-          this.inMemoryDb = migrated;
-          await idbManager.saveState(migrated);
-          return await this.reconcileWithCloud(migrated);
+      const cloud = await cloudSync.pull();
+      if (cloud) {
+        // Linha existe mas o conteudo esta incompleto (escrita truncada, schema
+        // de outra versao). Sem esta checagem a migracao estoura em
+        // `parsed.profile.xpHistory` e o usuario fica com uma tela branca.
+        if (!isDatabaseShape(cloud.data)) throw new CloudDataCorruptedError(cloudSync.getUser() || '');
+        // migrateDatabase() altera o objeto recebido. O "antes" precisa ser
+        // serializado ANTES, senao a comparacao e do banco com ele mesmo e a
+        // versao migrada nunca volta para a nuvem.
+        const antes = JSON.stringify(cloud.data);
+        const migrated = migrateDatabase(cloud.data);
+        this.inMemoryDb = migrated;
+        this.bootOrigin = 'da-nuvem';
+        if (JSON.stringify(migrated) !== antes) {
+          await cloudSync.push(migrated);
         }
-
-        // First run
-        const initial = createInitialDatabase();
-        this.inMemoryDb = initial;
-        await idbManager.saveState(initial);
-        return await this.reconcileWithCloud(initial);
-      } catch (err) {
-        console.error('Error initializing repository:', err);
-        const fallback = createInitialDatabase();
-        this.inMemoryDb = fallback;
-        return fallback;
+        return migrated;
       }
+
+      // Linha nova. Antes de criar do zero, tenta trazer o que ja existia —
+      // tanto na antiga linha por dispositivo quanto nas copias locais.
+      const imported = await this.importLegacyData();
+      const initial = imported ? migrateDatabase(imported) : createInitialDatabase();
+      this.inMemoryDb = initial;
+      // A nuvem confirma ANTES de qualquer limpeza: e a ordem que garante que
+      // nenhuma copia local sai daqui com o dado so nela.
+      await cloudSync.push(initial);
+      this.bootOrigin = imported ? 'importado' : 'criado-do-zero';
+      await this.clearLegacyCopies();
+      return initial;
+
     })();
 
     return this.initPromise;
   }
 
-  private loadFromLocalStorageFallback(): DatabaseSchema | null {
-    if (typeof localStorage === 'undefined') return null;
+  /**
+   * Traz os dados que existiam antes desta mudanca, misturando as tres fontes
+   * possiveis: a linha antiga do Supabase, a copia no IndexedDB e as que
+   * sobraram no localStorage. Nunca sobrescreve: so roda quando a linha nova
+   * ainda nao existe.
+   */
+  private async importLegacyData(): Promise<DatabaseSchema | null> {
+    const candidates: DatabaseSchema[] = [];
+
+    const legacyId = getLegacyDeviceId();
+    if (legacyId) {
+      try {
+        const row = await cloudSync.pull(legacyId);
+        if (row?.data) candidates.push(row.data);
+      } catch {
+        // Sem rede para a linha antiga: as copias locais abaixo ainda valem.
+      }
+    }
+
     try {
-      const v5 = localStorage.getItem(STORAGE_KEY_V5);
-      if (v5) return JSON.parse(v5);
-
-      const v4 = localStorage.getItem(STORAGE_KEY_V4);
-      if (v4) return JSON.parse(v4);
-
-      const v3 = localStorage.getItem('focosemanal_clean_db_v3');
-      if (v3) return JSON.parse(v3);
-    } catch (e) {
-      console.warn('LocalStorage fallback read error:', e);
+      const local = await idbManager.loadLegacyState();
+      if (local) candidates.push(local);
+    } catch {
+      // IndexedDB indisponivel: tenta o localStorage legado.
     }
-    return null;
-  }
 
-  private loadRawSync(): DatabaseSchema {
-    if (this.inMemoryDb) return this.inMemoryDb;
-    const fallback = this.loadFromLocalStorageFallback();
-    if (fallback) {
-      const migrated = migrateDatabase(fallback);
-      this.inMemoryDb = migrated;
-      return migrated;
-    }
-    const initial = createInitialDatabase();
-    this.inMemoryDb = initial;
-    return initial;
-  }
+    candidates.push(...this.readLocalStorageCopies());
 
-  private async persist(db: DatabaseSchema): Promise<void> {
-    this.inMemoryDb = db;
-    await idbManager.saveState(db);
-    this.scheduleCloudPush(db);
+    return this.pickMostRecent(candidates);
   }
 
   /**
-   * Se a nuvem tiver um snapshot mais novo (rev maior), adota-o localmente.
-   * Caso contrário, mantém o local (ele será empurrado pelo scheduleCloudPush).
+   * Escolhe qual copia antiga continua. Sem isso a importacao seria uma aposta:
+   * pegar a nuvem perderia o que ficou so no navegador, e pegar o local perderia
+   * o que a nuvem ja tinha.
+   *
+   * Vence a de atividade mais recente. No empate vence a mais cheia, porque
+   * nenhuma das duas provou ser a melhor e descartar conteudo e o pior desfecho
+   * possivel. O que nao ha como distinguir (uma mudanca so em Configuracoes, que
+   * nao deixa carimbo de tempo) fica por conta da nuvem, que e a copia que se
+   * sabe que chegou ao destino.
    */
-  private async reconcileWithCloud(db: DatabaseSchema): Promise<DatabaseSchema> {
-    const chosen = await cloudSync.reconcile(db);
-    if (chosen === db) return db;
-    const migrated = migrateDatabase(chosen);
-    this.inMemoryDb = migrated;
-    await idbManager.saveState(migrated);
-    return migrated;
+  private pickMostRecent(candidates: DatabaseSchema[]): DatabaseSchema | null {
+    const valid = candidates.filter(c => c && Array.isArray(c.tasks) && c.profile);
+    if (valid.length === 0) return null;
+
+    return valid.reduce((winner, candidate) => {
+      const dif = freshnessOf(candidate) - freshnessOf(winner);
+      if (dif > 0) return candidate;
+      if (dif < 0) return winner;
+      return contentCount(candidate) > contentCount(winner) ? candidate : winner;
+    });
   }
 
-  /** Empurra o snapshot local para a nuvem com debounce (coalesce rajadas). */
-  private scheduleCloudPush(db: DatabaseSchema): void {
-    if (this.cloudPushTimer) clearTimeout(this.cloudPushTimer);
-    this.cloudPushTimer = setTimeout(() => {
-      this.cloudPushTimer = null;
-      cloudSync.push(db).catch(() => {});
-    }, 1500);
+  /**
+   * Depois que a nuvem confirmou a importacao, as copias locais podem sair —
+   * agora elas sao redundantes e sao o que o usuario pediu para nao ter.
+   * A ordem importa: o localStorage e o caminho sincrono e nunca falha, e o
+   * IndexedDB vai por ultimo.
+   */
+  private async clearLegacyCopies(): Promise<void> {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(STORAGE_KEY_V5);
+        localStorage.removeItem(STORAGE_KEY_V4);
+        localStorage.removeItem('focosemanal_clean_db_v3');
+        clearLegacyDeviceId();
+      } catch (e) {
+        console.warn('Nao foi possivel limpar as copias locais antigas:', e);
+      }
+    }
+    await idbManager.deleteLegacyState();
+  }
+
+  private readLocalStorageCopies(): DatabaseSchema[] {
+    if (typeof localStorage === 'undefined') return [];
+    const found: DatabaseSchema[] = [];
+    for (const storageKey of [STORAGE_KEY_V5, STORAGE_KEY_V4, 'focosemanal_clean_db_v3']) {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) found.push(JSON.parse(raw) as DatabaseSchema);
+      } catch (e) {
+        console.warn(`LocalStorage fallback read error (${storageKey}):`, e);
+      }
+    }
+    return found;
+  }
+
+  /**
+   * Grava na nuvem. Nao lanca para dentro da UI: a interface segue responsiva
+   * e o que importa e o alerta visivel de "nao salvo", com retentativa.
+   */
+  private async persist(db: DatabaseSchema): Promise<void> {
+    this.inMemoryDb = db;
+    try {
+      await cloudSync.push(db);
+      this.lastSaveError = null;
+      idbManager.notifySaved(db);
+    } catch (err) {
+      this.lastSaveError = err;
+      console.error('Falha ao salvar no Supabase (mantido em memoria, com retentativa):', err);
+    }
   }
 
   // ==== UNDO STACK ====
@@ -618,6 +781,11 @@ class DataRepository {
           activityLog,
           updatedAt: now,
         };
+        // "Choveu" descreve UM dia: se a tarefa foi reagendada, a marca do dia
+        // anterior nao pode viaja-la (arrastar no board, adiar, finalizar dia).
+        if (existing.date && task.date && existing.date !== task.date) {
+          updated.blockedByRain = false;
+        }
         db.tasks[index] = updated;
         await this.persist(db);
         return updated;
@@ -656,6 +824,10 @@ class DataRepository {
       if (map.has(existing.id)) {
         const updated = map.get(existing.id)!;
         map.delete(existing.id);
+        // Mesma regra do saveTask: reagendar descarta a marca de chuva do dia.
+        if (existing.date && updated.date && existing.date !== updated.date) {
+          return { ...updated, blockedByRain: false, updatedAt: new Date().toISOString() };
+        }
         return { ...updated, updatedAt: new Date().toISOString() };
       }
       return existing;

@@ -166,6 +166,7 @@ export const FitMyDayModal: React.FC<FitMyDayModalProps> = ({
                 return (
                   <div 
                     key={task.id}
+                    data-gif-host
                     className="p-3 rounded-xl border border-[var(--borda)] bg-[var(--surface)] flex items-center justify-between gap-3 text-xs shadow-xs"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
