@@ -9,10 +9,7 @@ import {
   Achievement, 
   SpacedRepetitionItem, 
   StudyMode,
-  SubjectStructure,
-  WorkoutTemplate,
-  Module,
-  Topic
+  WorkoutTemplate
 } from './types';
 import { repository, DEFAULT_CATEGORIES, generateUUID } from './services/repository';
 import { audioSynthesizer } from './services/audioSynthesizer';
@@ -26,7 +23,6 @@ import { JourneyView } from './components/JourneyView';
 import { AchievementsView } from './components/AchievementsView';
 import { TaskModal } from './components/TaskModal';
 import { TaskDetailDrawer } from './components/TaskDetailDrawer';
-import { SubjectsCurriculumModal } from './components/SubjectsCurriculumModal';
 import { FullscreenFocusMode } from './components/FullscreenFocusMode';
 import { CommandPalette } from './components/CommandPalette';
 import { SettingsModal } from './components/SettingsModal';
@@ -37,7 +33,6 @@ import { TemplatesModal } from './components/TemplatesModal';
 import { OnboardingModal } from './components/OnboardingModal';
 import { RolloverBanner } from './components/RolloverBanner';
 import { CloseDayModal } from './components/CloseDayModal';
-import { FreeFocusModal } from './components/FreeFocusModal';
 import { InactivityPromptModal } from './components/InactivityPromptModal';
 import { FloatingMiniTimer } from './components/FloatingMiniTimer';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -58,7 +53,6 @@ export default function App() {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [templates, setTemplates] = useState<DayTemplate[]>([]);
   const [workoutTemplates, setWorkoutTemplates] = useState<WorkoutTemplate[]>([]);
-  const [subjectStructures, setSubjectStructures] = useState<SubjectStructure[]>([]);
   const [moods, setMoods] = useState<Record<string, DailyMood>>({});
   const [trash, setTrash] = useState<Array<Task & { originalDeletedAt: string }>>([]);
   const [spacedReps, setSpacedReps] = useState<SpacedRepetitionItem[]>([]);
@@ -74,7 +68,6 @@ export default function App() {
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
   const [selectedTaskForDrawer, setSelectedTaskForDrawer] = useState<Task | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isCurriculumOpen, setIsCurriculumOpen] = useState(false);
   const [modalInitialDate, setModalInitialDate] = useState<string | undefined>(undefined);
   const [isFocusModeOpen, setIsFocusModeOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -85,7 +78,6 @@ export default function App() {
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isCloseDayOpen, setIsCloseDayOpen] = useState(false);
-  const [isFreeFocusOpen, setIsFreeFocusOpen] = useState(false);
   const [isInactivityPromptOpen, setIsInactivityPromptOpen] = useState(false);
 
   // Active Timer state
@@ -109,7 +101,6 @@ export default function App() {
       loadedAchs,
       loadedTemplates,
       loadedWorkoutTpls,
-      loadedStructures,
       loadedMoods,
       loadedTrash,
       loadedSpaced,
@@ -121,7 +112,6 @@ export default function App() {
       repository.getAchievements(),
       repository.getTemplates(),
       repository.getWorkoutTemplates(),
-      repository.getSubjectStructures(),
       repository.getAllMoods(),
       repository.getTrash(),
       repository.getSpacedRepetitions(),
@@ -134,20 +124,12 @@ export default function App() {
     setAchievements(loadedAchs);
     setTemplates(loadedTemplates);
     setWorkoutTemplates(loadedWorkoutTpls);
-    setSubjectStructures(loadedStructures);
     setMoods(loadedMoods);
     setTrash(loadedTrash);
     setSpacedReps(loadedSpaced);
 
     if (!loadedSettings.onboardingCompleted) {
       setIsOnboardingOpen(true);
-    }
-
-    // Apply dark/light theme on root
-    if (loadedSettings.theme === 'dark' || (loadedSettings.theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
     }
   }, []);
 
@@ -446,56 +428,6 @@ export default function App() {
     setMoods(prev => ({ ...prev, [todayISO]: newMood }));
     showToast({ text: 'Registro de humor e energia salvo!', type: 'success' });
   }, [todayISO, showToast]);
-
-  // Save Subject Curriculum Structure
-  const handleSaveSubjectStructure = useCallback(async (structure: SubjectStructure) => {
-    await repository.saveSubjectStructure(structure);
-    setSubjectStructures(prev => {
-      const idx = prev.findIndex(s => s.categoryId === structure.categoryId);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = structure;
-        return next;
-      }
-      return [...prev, structure];
-    });
-    showToast({ text: 'Grade curricular da matéria atualizada!', type: 'success' });
-  }, [showToast]);
-
-  // Create Task from Curriculum Topic
-  const handleCreateTaskFromTopic = useCallback((category: Category, module: Module, topic: Topic) => {
-    setTaskToEdit({
-      id: undefined as any,
-      title: `Estudo: ${topic.name} (${module.name})`,
-      categoryId: category.id,
-      priority: 'alta',
-      date: todayISO,
-      estimatedMinutes: 45,
-      spentSeconds: 0,
-      completed: false,
-      tags: ['estudo', 'edital'],
-      subtasks: [
-        { id: generateUUID(), title: 'Revisar teoria e conceitos essenciais', completed: false },
-        { id: generateUUID(), title: 'Resolver 10 exercícios práticos', completed: false },
-        { id: generateUUID(), title: 'Registrar dúvidas e erros no resumo', completed: false },
-      ],
-      details: {
-        type: 'estudo',
-        moduleId: module.id,
-        moduleName: module.name,
-        topicId: topic.id,
-        topicName: topic.name,
-        studyType: 'teoria',
-        questionsDone: 0,
-        questionsCorrect: 0,
-      },
-      order: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    setIsTaskModalOpen(true);
-  }, [todayISO]);
-
   // Global Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -546,29 +478,14 @@ export default function App() {
         setIsPlanWeekOpen(false);
         setIsTemplatesOpen(false);
         setIsCloseDayOpen(false);
-        setIsFreeFocusOpen(false);
         setIsInactivityPromptOpen(false);
         setIsDrawerOpen(false);
-        setIsCurriculumOpen(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   });
-
-  // Toggle Theme
-  const handleToggleTheme = async () => {
-    if (!settings) return;
-    const nextTheme = settings.theme === 'dark' ? 'light' : 'dark';
-    const updated = await repository.updateSettings({ theme: nextTheme });
-    setSettings(updated);
-    if (nextTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  };
 
   // What to do now recommendation
   const recommendation = useMemo(() => {
@@ -715,9 +632,7 @@ export default function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenProfile={() => setIsSettingsOpen(true)}
         profile={profile}
-        settings={settings}
         categories={categories}
-        onToggleTheme={handleToggleTheme}
       />
 
       {/* Main Workspace Layout */}
@@ -765,11 +680,9 @@ export default function App() {
               if (activeTask) setIsFocusModeOpen(true);
               else showToast({ text: 'Inicie o foco em uma tarefa primeiro!' });
             }}
-            onOpenFreeFocus={() => setIsFreeFocusOpen(true)}
             onOpenCloseDay={() => setIsCloseDayOpen(true)}
             onOpenTemplates={() => setIsTemplatesOpen(true)}
             onOpenSpacedRep={() => setCurrentTab('jornada')}
-            onOpenCurriculum={() => setIsCurriculumOpen(true)}
             onOpenSettings={(section) => {
               setIsSettingsOpen(true);
             }}
@@ -901,18 +814,7 @@ export default function App() {
           setIsFocusModeOpen(true);
         }}
         categories={categories}
-        subjectStructures={subjectStructures}
         workoutTemplates={workoutTemplates}
-      />
-
-      {/* Subjects Curriculum Modal (Fase 3B) */}
-      <SubjectsCurriculumModal
-        isOpen={isCurriculumOpen}
-        onClose={() => setIsCurriculumOpen(false)}
-        categories={categories}
-        subjectStructures={subjectStructures}
-        onSaveStructure={handleSaveSubjectStructure}
-        onCreateTaskFromTopic={handleCreateTaskFromTopic}
       />
 
       {/* Close Day Modal ("Fechar o dia") */}
@@ -952,32 +854,6 @@ export default function App() {
           addXP(20);
           setConfettiActive(true);
           showToast({ text: 'Dia fechado com sucesso (+20 XP)! Bom descanso. 🌙', type: 'success' });
-        }}
-      />
-
-      {/* Free Focus Modal ("Foco livre") */}
-      <FreeFocusModal
-        isOpen={isFreeFocusOpen}
-        onClose={() => setIsFreeFocusOpen(false)}
-        categories={categories}
-        onSaveFreeSession={async (title, categoryId, durationSeconds, note) => {
-          const saved = await repository.saveTask({
-            title,
-            categoryId,
-            priority: 'media',
-            date: todayISO,
-            spentSeconds: durationSeconds,
-            completed: true,
-            completedAt: new Date().toISOString(),
-            reflectionNote: note,
-            tags: ['foco-livre'],
-            subtasks: [],
-            order: tasks.length,
-          });
-          setTasks(prev => [saved, ...prev]);
-          const earnedXP = Math.max(10, Math.floor(durationSeconds / 60));
-          addXP(earnedXP);
-          showToast({ text: `Sessão de foco livre salva (+${earnedXP} XP)! 🎉`, type: 'success' });
         }}
       />
 
@@ -1041,7 +917,6 @@ export default function App() {
           handleStartTimer(task);
           setIsFocusModeOpen(true);
         }}
-        onToggleTheme={handleToggleTheme}
         onExportJSON={async () => {
           const json = await repository.exportFullDatabaseJSON();
           const blob = new Blob([json], { type: 'application/json' });

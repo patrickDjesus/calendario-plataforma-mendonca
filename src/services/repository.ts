@@ -35,6 +35,7 @@ import {
   STORAGE_KEY_V4 
 } from '../constants/app';
 import { idbManager } from './db';
+import { cloudSync } from './supabase';
 import { calculateSM2 } from '../utils/xpSystem';
 
 export const DEFAULT_CATEGORIES: Category[] = [
@@ -386,9 +387,78 @@ export function createInitialDatabase(): DatabaseSchema {
   };
 }
 
+export function migrateDatabase(parsed: DatabaseSchema): DatabaseSchema {
+  if (!parsed.version || parsed.version < DB_VERSION) {
+    parsed.version = DB_VERSION;
+  }
+  if (!parsed.trash) parsed.trash = [];
+  if (!parsed.dailyMoods) parsed.dailyMoods = {};
+  if (!parsed.spacedRepetitions) parsed.spacedRepetitions = [];
+  if (!parsed.achievements) parsed.achievements = INITIAL_ACHIEVEMENTS;
+  if (!parsed.templates) parsed.templates = DEFAULT_TEMPLATES;
+  if (!parsed.workoutTemplates || parsed.workoutTemplates.length === 0) {
+    parsed.workoutTemplates = DEFAULT_WORKOUT_TEMPLATES;
+  }
+  if (!parsed.subjectStructures || parsed.subjectStructures.length === 0) {
+    parsed.subjectStructures = DEFAULT_SUBJECT_STRUCTURES;
+  }
+  if (!parsed.profile.xpHistory) parsed.profile.xpHistory = {};
+  if (typeof parsed.profile.streakShieldAvailable === 'undefined') {
+    parsed.profile.streakShieldAvailable = true;
+  }
+  if (!parsed.settings.fontSize) {
+    parsed.settings.fontSize = 'md';
+  }
+  if (!parsed.errorLogs) parsed.errorLogs = [];
+  if (!parsed.studyCycle) {
+    parsed.studyCycle = createInitialDatabase().studyCycle;
+  }
+  if (!parsed.flashcards) {
+    parsed.flashcards = createInitialDatabase().flashcards;
+  }
+  if (!parsed.simulatedExams) parsed.simulatedExams = [];
+  if (!parsed.habits || parsed.habits.length === 0) {
+    parsed.habits = DEFAULT_HABITS;
+  }
+  if (!parsed.bodyMeasurements) parsed.bodyMeasurements = [];
+  if (!parsed.exercisePRs) parsed.exercisePRs = {};
+  if (!parsed.distractionNotes) parsed.distractionNotes = [];
+  if (!parsed.focusSummaries) parsed.focusSummaries = [];
+
+  // Migrate standalone categories to cat-estudo
+  if (parsed.categories && parsed.categories.length > 0) {
+    parsed.categories = parsed.categories.filter(
+      c => c.id !== 'cat-matematica' && c.id !== 'cat-fisica'
+    );
+    if (!parsed.categories.some(c => c.id === 'cat-estudo')) {
+      parsed.categories.unshift({ id: 'cat-estudo', name: 'Estudo', color: '#3B6CF5', icon: 'book' });
+    }
+  } else {
+    parsed.categories = DEFAULT_CATEGORIES;
+  }
+
+  // Migrate tasks to cat-estudo
+  if (parsed.tasks && parsed.tasks.length > 0) {
+    parsed.tasks.forEach(t => {
+      if (t.categoryId === 'cat-matematica') {
+        t.categoryId = 'cat-estudo';
+        if (!t.tags) t.tags = [];
+        if (!t.tags.includes('matemática')) t.tags.push('matemática');
+      } else if (t.categoryId === 'cat-fisica') {
+        t.categoryId = 'cat-estudo';
+        if (!t.tags) t.tags = [];
+        if (!t.tags.includes('física')) t.tags.push('física');
+      }
+    });
+  }
+
+  return parsed;
+}
+
 class DataRepository {
   private inMemoryDb: DatabaseSchema | null = null;
   private initPromise: Promise<DatabaseSchema> | null = null;
+  private cloudPushTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     // Listen for tab sync
@@ -405,26 +475,26 @@ class DataRepository {
       try {
         const fromIdb = await idbManager.loadState();
         if (fromIdb) {
-          const migrated = this.applyMigrations(fromIdb);
+          const migrated = migrateDatabase(fromIdb);
           this.inMemoryDb = migrated;
           await idbManager.saveState(migrated);
-          return migrated;
+          return await this.reconcileWithCloud(migrated);
         }
 
         // Check localStorage migration
         const stored = this.loadFromLocalStorageFallback();
         if (stored) {
-          const migrated = this.applyMigrations(stored);
+          const migrated = migrateDatabase(stored);
           this.inMemoryDb = migrated;
           await idbManager.saveState(migrated);
-          return migrated;
+          return await this.reconcileWithCloud(migrated);
         }
 
         // First run
         const initial = createInitialDatabase();
         this.inMemoryDb = initial;
         await idbManager.saveState(initial);
-        return initial;
+        return await this.reconcileWithCloud(initial);
       } catch (err) {
         console.error('Error initializing repository:', err);
         const fallback = createInitialDatabase();
@@ -453,79 +523,11 @@ class DataRepository {
     return null;
   }
 
-  private applyMigrations(parsed: DatabaseSchema): DatabaseSchema {
-    if (!parsed.version || parsed.version < DB_VERSION) {
-      parsed.version = DB_VERSION;
-    }
-    if (!parsed.trash) parsed.trash = [];
-    if (!parsed.dailyMoods) parsed.dailyMoods = {};
-    if (!parsed.spacedRepetitions) parsed.spacedRepetitions = [];
-    if (!parsed.achievements) parsed.achievements = INITIAL_ACHIEVEMENTS;
-    if (!parsed.templates) parsed.templates = DEFAULT_TEMPLATES;
-    if (!parsed.workoutTemplates || parsed.workoutTemplates.length === 0) {
-      parsed.workoutTemplates = DEFAULT_WORKOUT_TEMPLATES;
-    }
-    if (!parsed.subjectStructures || parsed.subjectStructures.length === 0) {
-      parsed.subjectStructures = DEFAULT_SUBJECT_STRUCTURES;
-    }
-    if (!parsed.profile.xpHistory) parsed.profile.xpHistory = {};
-    if (typeof parsed.profile.streakShieldAvailable === 'undefined') {
-      parsed.profile.streakShieldAvailable = true;
-    }
-    if (!parsed.settings.fontSize) {
-      parsed.settings.fontSize = 'md';
-    }
-    if (!parsed.errorLogs) parsed.errorLogs = [];
-    if (!parsed.studyCycle) {
-      parsed.studyCycle = createInitialDatabase().studyCycle;
-    }
-    if (!parsed.flashcards) {
-      parsed.flashcards = createInitialDatabase().flashcards;
-    }
-    if (!parsed.simulatedExams) parsed.simulatedExams = [];
-    if (!parsed.habits || parsed.habits.length === 0) {
-      parsed.habits = DEFAULT_HABITS;
-    }
-    if (!parsed.bodyMeasurements) parsed.bodyMeasurements = [];
-    if (!parsed.exercisePRs) parsed.exercisePRs = {};
-    if (!parsed.distractionNotes) parsed.distractionNotes = [];
-    if (!parsed.focusSummaries) parsed.focusSummaries = [];
-
-    // Migrate standalone categories to cat-estudo
-    if (parsed.categories && parsed.categories.length > 0) {
-      parsed.categories = parsed.categories.filter(
-        c => c.id !== 'cat-matematica' && c.id !== 'cat-fisica'
-      );
-      if (!parsed.categories.some(c => c.id === 'cat-estudo')) {
-        parsed.categories.unshift({ id: 'cat-estudo', name: 'Estudo', color: '#3B6CF5', icon: 'book' });
-      }
-    } else {
-      parsed.categories = DEFAULT_CATEGORIES;
-    }
-
-    // Migrate tasks to cat-estudo
-    if (parsed.tasks && parsed.tasks.length > 0) {
-      parsed.tasks.forEach(t => {
-        if (t.categoryId === 'cat-matematica') {
-          t.categoryId = 'cat-estudo';
-          if (!t.tags) t.tags = [];
-          if (!t.tags.includes('matemática')) t.tags.push('matemática');
-        } else if (t.categoryId === 'cat-fisica') {
-          t.categoryId = 'cat-estudo';
-          if (!t.tags) t.tags = [];
-          if (!t.tags.includes('física')) t.tags.push('física');
-        }
-      });
-    }
-
-    return parsed;
-  }
-
   private loadRawSync(): DatabaseSchema {
     if (this.inMemoryDb) return this.inMemoryDb;
     const fallback = this.loadFromLocalStorageFallback();
     if (fallback) {
-      const migrated = this.applyMigrations(fallback);
+      const migrated = migrateDatabase(fallback);
       this.inMemoryDb = migrated;
       return migrated;
     }
@@ -537,6 +539,29 @@ class DataRepository {
   private async persist(db: DatabaseSchema): Promise<void> {
     this.inMemoryDb = db;
     await idbManager.saveState(db);
+    this.scheduleCloudPush(db);
+  }
+
+  /**
+   * Se a nuvem tiver um snapshot mais novo (rev maior), adota-o localmente.
+   * Caso contrário, mantém o local (ele será empurrado pelo scheduleCloudPush).
+   */
+  private async reconcileWithCloud(db: DatabaseSchema): Promise<DatabaseSchema> {
+    const chosen = await cloudSync.reconcile(db);
+    if (chosen === db) return db;
+    const migrated = migrateDatabase(chosen);
+    this.inMemoryDb = migrated;
+    await idbManager.saveState(migrated);
+    return migrated;
+  }
+
+  /** Empurra o snapshot local para a nuvem com debounce (coalesce rajadas). */
+  private scheduleCloudPush(db: DatabaseSchema): void {
+    if (this.cloudPushTimer) clearTimeout(this.cloudPushTimer);
+    this.cloudPushTimer = setTimeout(() => {
+      this.cloudPushTimer = null;
+      cloudSync.push(db).catch(() => {});
+    }, 1500);
   }
 
   // ==== UNDO STACK ====
@@ -1135,7 +1160,7 @@ class DataRepository {
       if (!parsed || !Array.isArray(parsed.tasks) || !parsed.profile) {
         throw new Error('Formato de backup inválido');
       }
-      const migrated = this.applyMigrations(parsed);
+      const migrated = migrateDatabase(parsed);
       await this.persist(migrated);
       return true;
     } catch (err) {

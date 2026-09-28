@@ -44,8 +44,25 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,gif,woff,woff2}'],
+          // The illustration set is large; keep it out of the precache and
+          // serve it cache-first so a GIF is only stored once it is requested.
+          globIgnores: ['**/gifs/**'],
           runtimeCaching: [
+            {
+              urlPattern: ({ request }) => request.destination === 'image' && /\/gifs\//.test(request.url),
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'gif-assets-cache',
+                expiration: {
+                  maxEntries: 60,
+                  maxAgeSeconds: 60 * 60 * 24 * 90,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
               handler: 'CacheFirst',

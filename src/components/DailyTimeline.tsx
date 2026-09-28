@@ -117,7 +117,7 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
 
         <div className="flex items-center gap-2">
           {conflictCount > 0 && (
-            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-bold border border-amber-500/20">
+            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 text-xs font-bold border border-amber-500/20">
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>{conflictCount} em conflito de horário</span>
             </span>
@@ -173,9 +173,9 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
               onDrop={(e) => handleDrop(e, hour)}
               className={`flex items-start gap-3 p-2.5 rounded-2xl transition-all border ${
                 isTarget
-                  ? 'bg-blue-50/60 dark:bg-blue-950/30 border-[var(--primary)] ring-2 ring-[var(--primary)]/30'
+                  ? 'bg-blue-50/60 border-[var(--primary)] ring-2 ring-[var(--primary)]/30'
                   : hasConflict
-                  ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700/50'
+                  ? 'bg-amber-50/50 border-amber-300 '
                   : slotTasks.length > 0
                   ? 'bg-[var(--surface-secondary)] border-[var(--borda)]'
                   : 'bg-[var(--surface)] hover:bg-[var(--surface-secondary)]/50 border-dashed border-[var(--borda)]'
@@ -201,7 +201,7 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
                 ) : (
                   <div className="space-y-2">
                     {hasConflict && (
-                      <div className="flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                      <div className="flex items-center gap-1 text-[11px] font-bold text-amber-600 ">
                         <AlertTriangle className="w-3.5 h-3.5" />
                         <span>Conflito: {slotTasks.length} tarefas agendadas para o mesmo horário</span>
                       </div>

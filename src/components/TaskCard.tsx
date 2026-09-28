@@ -154,7 +154,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer border-2 ${
             task.completed
               ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
-              : 'border-slate-300 dark:border-slate-600 hover:border-[var(--primary)] bg-[var(--surface)]'
+              : 'border-slate-300 hover:border-[var(--primary)] bg-[var(--surface)]'
           }`}
           title={task.completed ? 'Concluída' : 'Marcar como concluída (+XP)'}
           aria-label="Concluir tarefa"

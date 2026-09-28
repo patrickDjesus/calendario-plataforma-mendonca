@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Moon, Sparkles, CheckCircle2, ArrowRight, X, Clock, Calendar, CheckSquare } from 'lucide-react';
+import { Sparkles, CheckCircle2, ArrowRight, X, Clock, Calendar, CheckSquare } from 'lucide-react';
+import { GifIcon } from './GifIcon';
 import { Task, DailyMood, UserProfile } from '../types';
 import { formatSecondsToDigital, getTodayISO } from '../utils/dateUtils';
 
@@ -87,9 +88,7 @@ export const CloseDayModal: React.FC<CloseDayModalProps> = ({
 
         {/* Modal Header */}
         <div className="flex items-center gap-3 mb-5">
-          <div className="w-12 h-12 rounded-2xl bg-[var(--primary-soft)] text-[var(--primary)] flex items-center justify-center shrink-0 shadow-sm">
-            <Moon className="w-6 h-6" />
-          </div>
+          <GifIcon name="finalizar-dia" className="w-14 h-14 shrink-0" />
           <div>
             <h2 className="text-xl font-extrabold text-[var(--texto)]">Fechar o Dia</h2>
             <p className="text-xs text-[var(--texto-suave)] font-medium">
@@ -110,7 +109,7 @@ export const CloseDayModal: React.FC<CloseDayModalProps> = ({
           </div>
           <div>
             <span className="text-xs font-semibold text-[var(--texto-suave)] block">Concluídas</span>
-            <span className="text-lg font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
+            <span className="text-lg font-black text-emerald-600 tabular-nums">
               {completedTasks.length}/{todayTasks.length}
             </span>
           </div>

@@ -1,16 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { 
   ArrowRight, 
-  Play, 
   CheckCircle2, 
-  Clock, 
-  BookOpen, 
-  CheckSquare, 
-  Sparkles,
-  Zap,
-  Target,
-  Trophy,
-  ListTodo
+  Target
 } from 'lucide-react';
 import { Task, Category, UserProfile, UserSettings, DailyMood } from '../types';
 import { TaskCard } from './TaskCard';
@@ -19,6 +11,7 @@ import { NowNextBar } from './NowNextBar';
 import { DailyTimeline } from './DailyTimeline';
 import { STUDY_MODES, getDynamicMotivationPhrase, recommendNextTask } from '../utils/xpSystem';
 import { getTodayISO } from '../utils/dateUtils';
+import { GifIcon } from './GifIcon';
 
 interface DayDashboardProps {
   tasks: Task[];
@@ -156,7 +149,7 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
             {/* Header com ícone e título */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-[var(--primary)]" />
+                <GifIcon name="experiencia-acumulada" className="w-8 h-8" />
                 <h2 className="text-lg sm:text-xl font-bold text-[var(--texto)]">XP Diário</h2>
               </div>
               <span className="text-xs font-bold text-[var(--texto-suave)]">
@@ -180,7 +173,7 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
                   cx="112"
                   cy="112"
                   r={radius}
-                  className="text-[#E8ECF4] dark:text-[#262E40]"
+                  className="text-[#E8ECF4] "
                   strokeWidth="14"
                   stroke="currentColor"
                   fill="transparent"
@@ -268,7 +261,7 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
             {/* Header: Título "Tarefas do dia" + Contador + Filtros segmentados */}
             <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
               <div className="flex items-center gap-2">
-                <ListTodo className="w-5 h-5 text-[var(--primary)]" />
+                <GifIcon name="tarefas" className="w-8 h-8" />
                 <div>
                   <h2 className="text-lg sm:text-xl font-bold text-[var(--texto)]">Tarefas do dia</h2>
                   <span className="text-xs text-[var(--texto-suave)] font-medium">
@@ -355,7 +348,7 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
               <div>
                 <div className="flex items-center justify-between text-sm font-bold mb-1.5">
                   <div className="flex items-center gap-2">
-                    <CheckSquare className="w-4 h-4 text-[var(--primary)]" />
+                    <GifIcon name="tarefas-concluidas" className="w-8 h-8" />
                     <span className="text-[var(--texto)]">Tarefas concluídas</span>
                   </div>
                   <span className="text-[var(--primary)] font-extrabold tabular-nums">
@@ -376,7 +369,7 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
               <div>
                 <div className="flex items-center justify-between text-sm font-bold mb-1.5">
                   <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-[var(--primary)]" />
+                    <GifIcon name="tempo-total-cronometrado" className="w-8 h-8" />
                     <span className="text-[var(--texto)]">Sessões de foco</span>
                   </div>
                   <span className="text-[var(--primary)] font-extrabold tabular-nums">
@@ -397,7 +390,7 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
               <div>
                 <div className="flex items-center justify-between text-sm font-bold mb-1.5">
                   <div className="flex items-center gap-2">
-                    <Trophy className="w-4 h-4 text-[var(--primary)]" />
+                    <GifIcon name="fogo-sequencia" className="w-8 h-8" />
                     <span className="text-[var(--texto)]">Top 3 Prioridades</span>
                   </div>
                   <span className="text-[var(--primary)] font-extrabold tabular-nums">

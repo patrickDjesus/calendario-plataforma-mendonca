@@ -63,9 +63,9 @@ export const ErrorNotebookModal: React.FC<ErrorNotebookModalProps> = ({
   const filteredLogs = errorLogs.filter(e => filterReason === 'all' || e.reason === filterReason);
 
   const reasonLabels: Record<ErrorReason, { label: string; color: string }> = {
-    atencao: { label: 'Falta de Atenção', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30' },
-    nao_sabia: { label: 'Lacuna Teórica', color: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30' },
-    confundi: { label: 'Confusão Conceitual', color: 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30' },
+    atencao: { label: 'Falta de Atenção', color: 'bg-amber-500/10 text-amber-700 border-amber-500/30' },
+    nao_sabia: { label: 'Lacuna Teórica', color: 'bg-rose-500/10 text-rose-700 border-rose-500/30' },
+    confundi: { label: 'Confusão Conceitual', color: 'bg-purple-500/10 text-purple-700 border-purple-500/30' },
   };
 
   return (

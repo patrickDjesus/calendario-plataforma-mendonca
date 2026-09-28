@@ -1,11 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Sparkles, 
-  Send 
-} from 'lucide-react';
+import { Send } from 'lucide-react';
 import { Category, Task } from '../types';
 import { parseNaturalLanguageTask } from '../utils/nlpParser';
 import { getTodayISO } from '../utils/dateUtils';
+import { GifIcon } from './GifIcon';
 
 interface SmartInputBarProps {
   categories: Category[];
@@ -56,7 +54,7 @@ export const SmartInputBar: React.FC<SmartInputBarProps> = ({
     <div className="w-full">
       <form onSubmit={handleSubmit} className="relative">
         <div className="flex items-center gap-2.5 h-[52px] px-3.5 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--borda)] focus-within:border-[var(--primary)] focus-within:ring-1 focus-within:ring-[var(--primary)] transition-all">
-          <Sparkles className="w-4 h-4 text-[var(--primary)] shrink-0" />
+          <GifIcon name="nova-tarefa" className="w-7 h-7 shrink-0" />
 
           <input
             type="text"
@@ -125,7 +123,7 @@ export const SmartInputBar: React.FC<SmartInputBarProps> = ({
             <button
               type="button"
               onClick={() => handleAppendToken('!alta')}
-              className="px-2 py-0.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 font-bold transition-colors cursor-pointer"
+              className="px-2 py-0.5 rounded-lg bg-rose-50 text-rose-600 font-bold transition-colors cursor-pointer"
             >
               + !alta
             </button>

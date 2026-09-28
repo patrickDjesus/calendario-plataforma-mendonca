@@ -14,6 +14,18 @@ import {
   Globe 
 } from 'lucide-react';
 import { Category } from '../types';
+import { GifIcon, GifName } from './GifIcon';
+
+/** Categories that ship with a dedicated animated illustration. */
+const CATEGORY_GIF: Record<string, GifName> = {
+  book: 'tarefa-estudo',
+  estudo: 'tarefa-estudo',
+  'graduation-cap': 'tarefa-estudo',
+  briefcase: 'tarefa-trabalho',
+  trabalho: 'tarefa-trabalho',
+  'heart-pulse': 'tarefa-saude',
+  saude: 'tarefa-saude',
+};
 
 interface CategoryIconProps {
   category: Category;
@@ -23,6 +35,11 @@ interface CategoryIconProps {
 
 export const CategoryIcon: React.FC<CategoryIconProps> = ({ category, size = 'md', className = '' }) => {
   const getIconElement = (iconName: string, iconSizeClass: string) => {
+    const gif = CATEGORY_GIF[iconName.toLowerCase()];
+    if (gif) {
+      return <GifIcon name={gif} className="w-full h-full" />;
+    }
+
     switch (iconName.toLowerCase()) {
       case 'book':
       case 'estudo':
@@ -58,25 +75,24 @@ export const CategoryIcon: React.FC<CategoryIconProps> = ({ category, size = 'md
     }
   };
 
+  // So a ilustracao. Sem tile, sem gradiente, sem sombra: a cor da materia
+  // fica apenas no texto/label que acompanha o icone.
   const sizeClasses = {
-    sm: 'w-8 h-8 rounded-xl',
-    md: 'w-12 h-12 rounded-2xl',
-    lg: 'w-14 h-14 rounded-3xl',
+    sm: 'w-6 h-6',
+    md: 'w-8 h-8',
+    lg: 'w-10 h-10',
   };
 
   const iconSizes = {
-    sm: 'w-4 h-4 text-white',
-    md: 'w-6 h-6 text-white',
-    lg: 'w-7 h-7 text-white',
+    sm: 'w-6 h-6',
+    md: 'w-8 h-8',
+    lg: 'w-10 h-10',
   };
 
   return (
     <div
-      className={`flex items-center justify-center shadow-sm shrink-0 transition-transform duration-200 group-hover:scale-105 ${sizeClasses[size]} ${className}`}
-      style={{
-        background: `linear-gradient(135deg, ${category.color} 0%, ${category.color}CC 100%)`,
-        boxShadow: `0 6px 16px -2px ${category.color}35`,
-      }}
+      className={`flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 ${sizeClasses[size]} ${className}`}
+      style={{ color: category.color }}
     >
       {getIconElement(category.icon, iconSizes[size])}
     </div>

@@ -1,0 +1,773 @@
+================================================================================
+GUIA DE ÍCONES E ILUSTRAÇÕES - FOCOSEMANAL
+Sistema Visual de Ícones: Vetores Lucide + Ilustrações GIF Animadas
+================================================================================
+Escopo deste documento: SOMENTE o sistema de ícones.
+Componente de referência: src/components/GifIcon.tsx
+Estoque de ativos: public/gifs/ e public/gifs/still/
+
+--------------------------------------------------------------------------------
+ÍNDICE
+--------------------------------------------------------------------------------
+1. VISÃO GERAL: DOIS SISTEMAS DE ÍCONE
+2. ESTRUTURA DE ARQUIVOS DOS ATIVOS
+3. O COMPONENTE GifIcon (API COMPLETA)
+4. COMO FUNCIONA A ANIMAÇÃO NO HOVER (MECÂNICA DETALHADA)
+5. DIMENSIONAMENTO E PADRÕES DE SLOT
+6. CATEGORYICON - ÍCONES DE MATÉRIA / CATEGORIA
+7. AVATAR E BADGES (PROFILEAVATAR / STUDYMODEBADGE)
+8. INVENTÁRIO COMPLETO: ONDE CADA ILUSTRAÇÃO ESTÁ
+9. QUANDO USAR VETOR E QUANDO USAR GIF
+10. ACESSIBILIDADE E PERFORMANCE
+11. COMO ADICIONAR UM NOVO ÍCONE (PASSO A PASSO)
+12. REFERÊNCIA RÁPIDA
+
+================================================================================
+1. VISÃO GERAL: DOIS SISTEMAS DE ÍCONE
+================================================================================
+
+A interface usa DOIS sistemas de ícone complementares. A escolha entre eles é
+funcional, não estética.
+
+A) VETORES LUCIDE (lucide-react)
+   Ícones SVG de traço, monocromáticos, herdam a cor do texto via `currentColor`
+   e pesam ~1 KB. São a escolha padrão para ações utilitárias de baixo destaque:
+   busca, play/pause, fechar modal, setas, checkboxes, filtro.
+   Uso: <Search className="w-5 h-5" />
+
+B) ILUSTRAÇÕES GIF (GifIcon)
+   Desenhos animados coloridos em 256x256 ou 640x640, com canal alfa, servidos
+   de /public/gifs. São reservadas para pontos de ENTRADA e de IDENTIDADE —
+   navegação, abas principais, ferramentas do menu lateral, tiles de estatística
+   e a família de cada matéria.
+   Uso: <GifIcon name="nova-tarefa" className="w-6 h-6" playOnHover />
+
+REGRA DE OURO
+   Ícone vetorial = "faça isto agora" (ação utilitária, repetitiva, pequena).
+   Ilustração GIF = "isto é uma área / conceito" (identidade, navegação, avatar).
+   Nunca use uma ilustração animada onde um vetor de 16px bastaria: o custo de
+   banda e CPU é ordens de grandeza maior e a leitura piora.
+
+------------------------------------------------------------------------------------------------
+1.1 MODO DE ANIMAÇÃO
+------------------------------------------------------------------------------------------------
+Existem dois comportamentos, e a escolha é feita pelo prop `playOnHover`:
+
+- ILUSTRAÇÃO SEMPRE ANIMADA (padrão)
+  Loopa em continuidade. Reservado a tiles de estatística, ícones de matéria e
+  ilustrações que nunca se repetem em grande quantidade na mesma tela. O movimento
+  contínuo sinaliza "este dado está vivo" / "isto é uma matéria".
+
+- ILUSTRAÇÃO COM ANIMAÇÃO NO HOVER (`playOnHover`)
+  Exibe um frame estático e só anima quando o ponteiro entra no elemento
+  interativo que a hospeda (botão, link, aba) — ver seção 4 — ou quando ele
+  recebe foco de TECLADO. No celular, um toque reproduz aproximadamente um
+  ciclo. Obrigatório em barras de navegação e menus, onde dezenas de animações
+  simultâneas causariam ruído visual e piscariam. Hoje é usado em toda a barra
+  superior e em todo o menu lateral.
+
+NENHUMA ILUSTRAÇÃO VAI DENTRO DE UMA MOLDURA
+  Não existe tile, quadrado colorido, gradiente, borda, raio, sombra nem
+  `overflow-hidden` em volta de um GIF. A arte é exibida solta. O contraste vem
+  da própria ilustração, não de um fundo artificial. Se o asset tiver fundo
+  branco incorporado, ele é removido por `mix-blend-mode: multiply` (seção 5.2).
+
+================================================================================
+2. ESTRUTURA DE ARQUIVOS DOS ATIVOS
+================================================================================
+
+public/
+├── gifs/
+│   ├── <nome>.gif            -> animação contínua (21 arquivos, ~6,8 MB)
+│   ├── foguete.png           -> único PNG estático (não tem par animated)
+│   └── still/
+│       └── <nome>.png        -> "poster frame": o 1º frame do GIF, extraído
+│                                 como PNG (~0,7 KB a ~11 KB cada)
+
+CONVENÇÃO DE NOMES
+  Todo arquivo usa o mesmo identificador (`nome`) nas três camadas. O TypeScript
+  garante isso na prática: o tipo `GifName` é uma união de literais, então um
+  nome de arquivo que não existe no disco só é descoberto em runtime.
+  Nomes em ASCII minúsculo com hífen (`nova-tarefa`, `tempo-total-cronometrado`).
+
+POR QUE O PARTE "still/" EXISTE
+  Não existe forma em CSS puro de congelar um GIF. A solução adotada é extrair o
+  primeiro frame para um PNG e trocar o `src` da <img> entre o PNG e o GIF. Isso
+  dá um estado inicial realmente estático, sem canvas e sem "flash" do primeiro
+  frame em reversa.
+
+ARQUIVOS ATIVOS (21 GIF + 1 PNG + 21 PNG de still = 43 arquivos)
+  inicio, tarefas, semana, jornada, nova-tarefa, modo-foco, finalizar-dia,
+  modelos-rotina, revisao-espacada, lixeira, configuracao, fogo-sequencia,
+  tempo-total-cronometrado, experiencia-acumulada, tarefas-concluidas,
+  dia-chuvoso, tarefa-estudo, tarefa-saude, tarefa-trabalho, avatar-homem,
+  avatar-mulher, foguete.png
+
+DIMENSÕES ORIGINAIS
+  256x256 (com alfa) : a maioria, usada em navegação, menu lateral e matérias.
+  640x640 (SEM alfa)  : fogo-sequencia, tempo-total-cronometrado,
+                        experiencia-acumulada, tarefas-concluidas, dia-chuvoso.
+                        São desenhos "cheios" (fundo opaco). Ver seção 5.2.
+
+================================================================================
+3. O COMPONENTE GifIcon (API COMPLETA)
+================================================================================
+
+Arquivo: src/components/GifIcon.tsx
+
+ESTADO HTML GERADA
+
+  <span class="inline-flex items-center justify-center shrink-0 {className}">
+    <img src="{png estático | gif animado}" class="w-full h-full object-contain
+         pointer-events-none select-none
+         [mix-blend-multiply quando o asset tem fundo branco]"
+         alt="" draggable="false" decoding="async">
+  </span>
+
+  O <span> externo é a "caixa" (controla o tamanho e o alinhamento). Ele NÃO tem
+  nenhum handler: a animação é comandada pelo hospedeiro, não pela ilustração
+  (seção 4). O <img> interno preenche 100% da caixa e nunca captura o clique — o
+  evento sobe para o <button> ancestral. `draggable="false"` impede que o usuário
+  arraste a imagem ao clicar repetidamente no ícone.
+
+PROPS
+
+  name          (obrigatório)  GifName — o identificador do arquivo.
+  playOnHover   (padrão: false) true = frame estático até hover/foco/toque.
+  className     (padrão: '')    Aplicado na caixa <span>. É aqui que se define
+                                 o tamanho (w-6 h-6, w-14 h-14, w-full h-full...).
+  alt           (padrão: '')    Texto alternativo. Deixe vazio ('') quando o
+                                 ícone é decorativo ou quando o <button> já tem
+                                 `aria-label` / texto visível adjacente.
+  eager         (padrão: false) Desliga o lazy loading. Use em ícones acima da
+                                 dobra que precisam estar prontos no hover.
+  blend         (padrão: auto)  Sobrescreve o blend automático. Passe
+                                 `blend={false}` quando a ilustração for exibida
+                                 sobre um fundo ESCURO ou COLORIDO — `multiply`
+                                 escureceria a arte. Ver seção 5.2.
+
+EXEMPLOS DE USO
+
+  // Menu lateral: estático, anima quando o ponteiro entra no botão
+  <GifIcon name="modo-foco" className="w-6 h-6" playOnHover eager />
+
+  // Tile de estatística: sempre animado, carrega sob demanda
+  <GifIcon name="experiencia-acumulada" className="w-14 h-14 shrink-0" />
+
+  // Seletor de avatar: estático, anima no hover/toque
+  <GifIcon name="avatar-mulher" className="w-11 h-11" playOnHover />
+
+  // Sobre fundo escuro: sem multiply
+  <GifIcon name="dia-chuvoso" className="w-5 h-5" playOnHover blend={false} />
+
+================================================================================
+4. COMO FUNCIONA A ANIMAÇÃO NO HOVER (MECÂNICA DETALHADA)
+================================================================================
+
+4.1 A ANIMAÇÃO PERTENCE AO HOST, NÃO À ILUSTRAÇÃO
+--------------------------------------------------------------------------------
+  A caixa <span> NÃO tem nenhum handler. Quem comanda a animação é o elemento
+  INTERATIVO que a hospeda, localizado em tempo de execução:
+
+    const HOST_SELECTOR = 'button, a, [role="button"], [role="tab"], [data-gif-host]';
+    const host = boxRef.current.closest(HOST_SELECTOR) ?? boxRef.current;
+
+  Por que isso importa: o usuário mira no BOTÃO, não no desenho. Com handlers no
+  <span>, a animação só começava se o ponteiro estivesse exatamente sobre os
+  24px da ilustração — o resto do botão (rótulo, padding, as duas linhas de texto
+  do menu lateral) era "área morta". Buscando o ancestral, o botão inteiro é a
+  área de ativação.
+
+  O seletor de fallback permite declarar a intenção explicitamente quando não há
+  elemento interativo no DOM:
+
+    <div data-gif-host> <GifIcon name="inicio" playOnHover /> </div>
+
+4.2 OS QUATRO EVENTOS
+--------------------------------------------------------------------------------
+  Todos nativos, ligados no `useEffect` e removidos no cleanup:
+
+  Evento        Quando dispara                      Efeito
+  -----------   ---------------------------------   --------------------------
+  pointerenter  ponteiro entrou no HOST              src = GIF
+  pointerleave  ponteiro saiu do HOST                src = PNG estático
+  focusin       um descendente do HOST recebeu foco  src = GIF*
+  focusout      o foco saiu do HOST                  src = PNG estático
+  pointerdown   toque em tela sensível ao toque      src = GIF por ~1 ciclo
+
+  * `focusin` só ativa se `event.target.matches(':focus-visible')`. Isso separa
+  o foco de TECLADO (Tab) do foco por clique do mouse. Clicar num botão da
+  barra superior não deixaria a ilustração animada para sempre; tabular sim.
+
+4.3 TOQUE (CELULAR) — HOVER NÃO EXISTE
+--------------------------------------------------------------------------------
+  Em telas de toque não há `pointerenter`. A regra é:
+
+  - `pointerenter` / `pointerleave` com `pointerType === 'touch'` são IGNORADOS.
+  - `pointerdown` com `pointerType === 'touch'` reproduz aproximadamente UM
+    CICLO e volta sozinho para o PNG estático. O tempo é lido da tabela LOOP_MS
+    (a duração real de cada GIF, medida pelo Graphic Control Extension) + 250ms
+    de folga, com 2000ms como padrão para assets sem entrada na tabela.
+
+  Assim o toque não deixa nada preso nem força um ciclo e meio.
+
+4.4 FLUXO DE ESTADOS
+--------------------------------------------------------------------------------
+  1. Montagem         src = /gifs/still/<nome>.png   (frame 0, ~1 KB)
+                       -> primeiro paint leve, sem animação
+  2. Idle do navegador src = ainda o PNG
+                       -> requestIdleCallback agenda o pré-carregamento do GIF
+  3. pointerenter     src = /gifs/<nome>.gif  -> animação inicia do frame 0
+     (ou focusin,     -> preload já feito => troca instantânea, sem "piscar"
+      ou pointerdown)
+  4. pointerleave     src = volta para /gifs/still/<nome>.png
+     (ou focusout)     -> a animação reinicia a cada nova entrada
+
+O QUE EVITA O "PISCAR" (flash de imagem branca)
+  Quando o src muda, o navegador pode exibir um frame vazio enquanto decodifica.
+  Duas garantias contra isso:
+  a) PRÉ-CARREGAMENTO ANTECIPADO: o GIF é baixado e decodificado antes do hover,
+     num callback ocioso (requestIdleCallback), não no primeiro hover. Os bytes
+     já estão no cache HTTP e no decoded cache do navegador.
+  b) VOLTA AO MESMO PNG: como o estado final é sempre o mesmo PNG do início,
+     nunca há degradação cumulativa ao entrar e sair várias vezes.
+
+POR QUE O PRÉ-CARREGAMENTO É FEITO EM IDLE
+  A barra superior e o menu lateral somam ~13 ilustrações com `playOnHover`.
+  Baixá-las imediatamente custaria ~2,2 MB de banda competindo com o first
+  paint — pior para o LCP em 3G/4G. No idle, o download acontece só depois que a
+  tela já está interativa. Como o usuário precisa mover o mouse (centenas de ms)
+  antes de dar o primeiro hover, o arquivo quase sempre já está pronto.
+  Há timeout de segurança de 4s (ou setTimeout de 1200ms em navegadores sem
+  requestIdleCallback) para nunca deixar o GIF indefinidamente sem baixar.
+
+SÍMBOLOS USADOS NO CÓDIGO
+
+  GIF_DIR   = '/gifs'          // animação
+  STILL_DIR = '/gifs/still'    // frame estático
+  isStatic  = true quando o asset é PNG puro (foguete) OU quando o usuário
+              pediu movimento reduzido (ver seção 10.1)
+
+  Se isStatic for true, `playOnHover` é ignorado: o componente sempre aponta para
+  a imagem estática, pois animar violaria a preferência do usuário.
+
+================================================================================
+5. DIMENSIONAMENTO E PADRÕES DE SLOT
+================================================================================
+
+5.1 ESCALAS DE TAMANHO USADAS NO PROJETO
+--------------------------------------------------------------------------------
+  Como não existe mais moldura, a ilustração ocupa o slot inteiro. Os tamanhos
+  subiram um degrau em relação à versão com tile.
+
+  w-5  h-5  (20px)  Botão com rótulo, sobre fundo escuro (ex.: "Chuva" no foco)
+  w-6  h-6  (24px)  Escala PADRÃO de navegação (menu lateral e abas do header)
+  w-7  h-7  (28px)  Ilustração dentro de um campo de entrada (SmartInputBar)
+  w-8  h-8  (32px)  Cabeçalho de cartão e metas de dia (ex.: "XP Diário",
+                    "Tarefas do dia", "Sessões de foco")
+  w-11 h-11 (44px)  Cabeçalho de modal e seletor de avatar
+  w-14 h-14 (56px)  Cards de estatística da Jornada e cartões de destaque
+  w-16/sm:w-24     Avatar de perfil (64px no celular, 96px no desktop)
+  w-full h-full    Preenchendo integralmente a caixa do pai (CategoryIcon)
+
+  NOTA: não há mais "folga para o fundo do tile aparecer como moldura". A arte
+  encosta nos limites do slot; se precisar de respiro, aumente o padding do
+  CONTÊINER (o cartão), nunca diminua a ilustração para caber num quadrado.
+
+5.2 OS GIFS DE 640x640 (FUNDO BRANCO INCORPORADO)
+--------------------------------------------------------------------------------
+  fogo-sequencia, tempo-total-cronometrado, experiencia-acumulada,
+  tarefas-concluidas e dia-chuvoso são quadrados 640x640 SEM transparência: o
+  arquivo carrega um fundo branco opaco.
+
+  MEDIÇÃO (ver section 11, scripts/gif-assets.mjs)
+    A borda externa de 3px de cada frame é 100% rgb(255,255,255) — em TODOS os
+    frames, não só no frame 0. Logo, o branco é uniforme e não anima.
+
+  SOLUÇÃO: mix-blend-mode: multiply
+    Com `multiply`, cada pixel é multiplicado pelo que está atrás. Branco
+    (255,255,255) vezes a cor de fundo devolve exatamente a cor de fundo: o
+    quadrado branco desaparece sem recorte, sem colorkey, sem reexportar o GIF e
+    sem `overflow-hidden`. Não há motivo para cortar a arte.
+
+    A classe é aplicada AUTOMATICAMENTE pelo componente, pela lista WHITE_BACKDROP
+    em GifIcon.tsx:
+
+      const WHITE_BACKDROP = {
+        'fogo-sequencia': true, 'tempo-total-cronometrado': true,
+        'experiencia-acumulada': true, 'tarefas-concluidas': true,
+        'dia-chuvoso': true,
+      };
+
+  A ATENÇÃO OBRIGATÓRIA: multiply funciona contra um fundo CLARO.
+    Os cinco assets são exibidos em cartões claros (--surface #FFFFFF), onde
+    funcionam. Se um deles for para um fundo escuro ou saturado, o branco vira
+    a cor do fundo e a arte escurece. Nesse caso:
+
+      <GifIcon name="dia-chuvoso" className="w-5 h-5" blend={false} />
+
+    Foi o que aconteceu no botão de som ambiente do FullscreenFocusMode, que é
+    escuro por definição. Confira o fundo real sempre que mover um asset 640.
+
+5.3 O SLOT DE BOTÃO NAVEGÁVEL (padrão do menu lateral)
+--------------------------------------------------------------------------------
+  <button class="caixa do tile: fundo, cor, group-hover:scale-110">
+    <GifIcon className="w-6 h-6 transition-transform group-hover:scale-110" />
+    <div class="rótulo em duas linhas: label1 / label2">
+  </button>
+
+  O botão é o HOST: basta estar dentro de um <button> para o hover ser
+  capturado automaticamente. O `group-hover:scale-110` acompanha a ilustração.
+
+5.4 OBJECT-FIT E PROPORÇÃO
+--------------------------------------------------------------------------------
+  O <img> usa SEMPRE `object-contain`. As ilustrações são quadradas, então
+  contain e cover coincidem; contain apenas garante que nada seja cortado caso
+  um asset futuro venha com proporção diferente.
+
+5.5 O APLICATIVO É EXCLUSIVAMENTE CLARO
+--------------------------------------------------------------------------------
+  Não existe tema escuro: nenhuma classe `dark:`, nenhum bloco `.dark` em
+  index.css, nenhum botão de tema, nenhum comando de tema. O `:root` declara
+  `color-scheme: light` e o `<meta name="theme-color">` é único e claro.
+
+  O campo `UserSettings.theme` continua existindo no tipo e no banco, e os
+  backups antigos são lidos normalmente, mas o valor é IGNORADO pela interface.
+  Isso mantém a compatibilidade sem reabrir a porta para o modo escuro.
+
+  A ÚNICA superfície escura do produto é a barra lateral
+  (--sidebar #1E1F22), que existe para destacar a navegação das ferramentas.
+  Nada de ilustração 640x640 com `multiply` deve ser posto lá: use um asset 256
+  com alfa, que já é o caso de todos os ícones do menu.
+
+================================================================================
+6. CATEGORYICON - ÍCONES DE MATÉRIA / CATEGORIA
+================================================================================
+
+Arquivo: src/components/CategoryIcon.tsx
+Este é o ÚNICO ponto de tradução entre uma Categoria (dados) e sua arte.
+Existem 13 call sites espalhados por 12 arquivos que se beneficiam da troca
+automática — nenhum deles precisa saber se a arte é GIF ou vetor.
+
+MAPA MATÉRIA -> ARTE
+
+  book / estudo / graduation-cap  ->  tarefa-estudo.gif
+  briefcase / trabalho            ->  tarefa-trabalho.gif
+  heart-pulse / saude             ->  tarefa-saude.gif
+  calculator, atom, user, code,
+  palette, music, globe,
+  tag (fallback)                  ->  vetores Lucide (sem arte dedicada)
+
+  As categorias Personalizado e Outro não possuem ilustração e seguem no vetor.
+  Para adicionar arte a uma delas basta uma linha no objeto CATEGORY_GIF.
+
+ESTRUTURA DO COMPONENTE
+
+  <div class="flex items-center justify-center shrink-0
+              transition-transform duration-200 group-hover:scale-105
+              w-6|w-8|w-10"
+       style="color: <cor da matéria>">
+    <GifIcon className="w-full h-full" />       // só quando há arte
+    <BookOpen className="w-8 h-8" />            // caso contrário, herda a cor
+  </div>
+
+  Sem tile, sem gradiente, sem borda, sem raio, sem sombra, sem
+  `overflow-hidden`. A cor da matéria NÃO aparece mais no fundo do ícone: ela
+  vive apenas no texto/rótulo que acompanha o ícone (o nome da categoria, o
+  pill de prioridade, etc.). No vetor de fallback ela é passada por
+  `currentColor`, para o glifo acompanhar a matéria sem precisar de moldura.
+
+TAMANHOS (props `size`)
+  sm = w-6 h-6 (24px)  — uso denso: linhas, modais, header
+  md = w-8 h-8 (32px)  — uso de destaque: TaskCard, NowNextBar
+  lg = w-10 h-10 (40px) — reservado
+
+  O `className` recebido sobrescreve o tamanho quando necessário, e é assim que
+  os call sites obtêm 16px ou 20px sem criar novos tamanhos no componente:
+    className="!w-4 !h-4 !rounded"            (WeekView, linha da grade)
+    className="!w-5 !h-5 !rounded-md"         (TaskModal, lista compacta)
+    className="!w-7 !h-7 sm:!w-8 sm:!h-8 ..."  (TasksInboxView, linha de tarefa)
+
+  ATENÇÃO: o `!` (important) é obrigatório porque o className é concatenado
+  depois de sizeClasses no atributo class, e ambos têm a mesma especificidade.
+
+COMPORTAMENTO
+  As ilustrações de matéria animam SEMPRE (sem playOnHover), pois aparecem como
+  marcador repetido e identificam a matéria em contexto, não como ação pontual.
+
+================================================================================
+7. AVATAR E BADGES (PROFILEAVATAR / STUDYMODEBADGE)
+================================================================================
+
+Ambos vivem em GifIcon.tsx e resolvem um valor de dados (string) em uma arte.
+
+7.1 PROFILEAVATAR
+--------------------------------------------------------------------------------
+  Resolve o campo UserProfile.avatar, que é persistido no IndexedDB como texto.
+ Há duas tabelas de resolução:
+
+  AVATAR_GIF         chaves novas gravadas pelo onboarding:
+                    'foguete', 'homem', 'mulher', 'avatar-homem', 'avatar-mulher'
+
+  LEGACY_AVATAR_GIF  emojis antigos, ainda no banco de usuários existentes:
+                    '🚀' e '🎓'        -> foguete
+                    '🧠'                -> tarefa-estudo
+                    '🎯' e '⚡'         -> experiencia-acumulada
+                    '🔥'                -> fogo-sequencia
+                    '🦉'                -> tarefa-trabalho
+
+  O emoji '📚' (livro) foi REMOVIDO de propósito: ele era o que aparecia no
+  perfil da barra superior e o usuário não queria ver um livro ali. Sem
+  correspondência, `resolveAvatarGif` cai em DEFAULT_AVATAR ('avatar-homem').
+  O avatar do Header é fixo em 'avatar-homem' e o seed padrão do repositório
+  também — os dois pontos onde o usuário reclamou do ícone errado.
+
+  Se o valor não corresponder a nenhuma tabela, o componente DEVOLVE o texto
+  original dentro de um <span> — nunca quebra a tela. Essa degradação é
+  intencional: o avatar é dado de usuário, não constante do design.
+
+  Uso: <ProfileAvatar value={profile.avatar} className="w-full h-full" />
+
+7.2 AVATAR_OPTIONS
+--------------------------------------------------------------------------------
+  A lista do seletor do OnboardingModal, com 8 opções — todas com arte real,
+  escolhidas do estoque disponível (foguete, avatar-homem, avatar-mulher,
+  tarefa-estudo, tarefa-saude, tarefa-trabalho, fogo-sequencia,
+  experiencia-acumulada). Trocar a lista aqui troca as opções da tela.
+
+7.3 STUDYMODEBADGE
+--------------------------------------------------------------------------------
+  Converte o campo `badge` de STUDY_MODES (em xpSystem.ts) em arte:
+    '🔥' -> fogo-sequencia
+    '⚡' -> experiencia-acumulada
+    '🌱' -> (sem arte) devolve o emoji
+
+  Uso: <StudyModeBadge badge={conf.badge} className="w-8 h-8" />
+
+================================================================================
+8. INVENTÁRIO COMPLETO: ONDE CADA ILUSTRAÇÃO ESTÁ
+================================================================================
+
+8.1 COM ANIMAÇÃO APENAS NO HOVER — BARRA SUPERIOR (Header.tsx)
+--------------------------------------------------------------------------------
+  Ilustração        Slot                    Tamanho
+  inicio            Aba "Início"            w-6 h-6
+  tarefas           Aba "Tarefas"           w-6 h-6
+  semana            Aba "Semana"            w-6 h-6
+  jornada           Aba "Jornada"           w-6 h-6
+  configuracao      Botão de Ajustes (⚙)    w-6 h-6
+  (avatar)          Botão de Perfil         w-full h-full  [avatar-homem fixo]
+
+  A MARCA é só texto: o nome "Plataforma Mendonça" em gradiente, sem
+  ilustração. O foguete saiu do cabeçalho.
+
+8.2 COM ANIMAÇÃO APENAS NO HOVER — MENU LATERAL (Sidebar.tsx)
+--------------------------------------------------------------------------------
+  Ilustração        Slot                    Tamanho
+  nova-tarefa       Nova tarefa (+)         w-6 h-6   [primária, azul]
+  modo-foco         Modo Foco               w-6 h-6
+  finalizar-dia     Fechar o dia            w-6 h-6
+  modelos-rotina    Modelos de rotina       w-6 h-6
+  revisao-espacada  Revisões espaçadas      w-6 h-6
+  lixeira           Lixeira 30 dias         w-6 h-6
+  configuracao      Ajustes e backup        w-6 h-6
+
+  A mesma lista alimenta a coluna desktop (96px) e a barra inferior do mobile —
+  o item é identificado por `gif` e ambos os pontos de renderização consultam o
+  mesmo helper. Um item novo cai nos dois lugares de graça.
+
+  DOIS ITENS FORAM REMOVIDOS DA LISTA
+    - FOCO LIVRE      (Timer)      — subsumido pelo Modo Foco
+    - CONTEÚDOS/EDITAL (BookOpen)  — não é mais necessário
+  Com eles saíram os modais FreeFocusModal.tsx e SubjectsCurriculumModal.tsx e
+  todo o estado que os abria. A grade curricular continua tipada e gravada
+  (SubjectStructure no tipo de backup), só não tem mais tela.
+
+8.3 SEMPRE ANIMADAS
+--------------------------------------------------------------------------------
+  Ilustração                Slot
+  tarefa-estudo             ícone de matéria (via CategoryIcon)
+  tarefa-saude              ícone de matéria (via CategoryIcon)
+  tarefa-trabalho           ícone de matéria (via CategoryIcon)
+
+  fogo-sequencia            JourneyView (Sequência Atual)
+                            WelcomeCard (tile de sequência)
+  tempo-total-cronometrado  JourneyView (Tempo Total Cronometrado)
+                            DayDashboard (meta "Sessões de foco")
+  experiencia-acumulada     JourneyView (Experiência Acumulada)
+                            DayDashboard (cabeçalho "XP Diário")
+  tarefas-concluidas        JourneyView (Tarefas Concluídas)
+                            DayDashboard (meta "Tarefas concluídas")
+  dia-chuvoso               FullscreenFocusMode (botão de som ambiente "Chuva")
+  tarefas                   TasksInboxView (cabeçalho "Tarefas & Fluxo")
+                            DayDashboard (cabeçalho "Tarefas do dia")
+  nova-tarefa               SmartInputBar (campo de entrada inteligente)
+                            TasksInboxView (botão "Nova Tarefa")
+  modelos-rotina            TemplatesModal (cabeçalho do modal)
+                            WeekHeader (botão "Modelos" da barra semanal)
+  (avatar)                  OnboardingModal (seletor de avatar, hover)
+                            AchievementsView (bloco de nível)
+                            WelcomeCard (avatar 64/96px, sem moldura)
+
+  Nota: AchievementsView fica sobre um gradiente azul/índigo escuro, então
+  qualquer asset 640x640 lá precisaria de `blend={false}`. Hoje só aparecem
+  avatares 256 com alfa, e o `blend={false}` está explícito por precaução.
+
+8.4 PONTOS QUE PERMANECEM VETORIAIS POR DECISÃO
+--------------------------------------------------------------------------------
+  Ícones de ação utilitária dentro de texto ou dentro de controles densos:
+  busca, play/pause, stop, X (fechar), check, pin, star (top 3), setas de
+  navegação do mês, chevrons, view-switcher (lista/quadro/calendário), filtro,
+  lixeira em menu de contexto, download (.ICS), alarme,smile,ayuda.
+
+================================================================================
+9. QUANDO USAR VETOR E QUANDO USAR GIF
+================================================================================
+
+USE ILUSTRAÇÃO GIF QUANDO:
+  - O slot representa uma ÁREA ou ABAS do produto (Início, Tarefas, Semana,
+    Jornada).
+  - O slot identifica uma MATÉRIA / CATEGORIA.
+  - O slot é a IDENTIDADE do usuário (avatar) ou da MARCA (logotipo).
+  - O slot representa uma CONCEITO/ESTADO do sistema (sequência, XP, tempo
+    total, tarefas concluídas).
+  - O slot é o cabeçalho de um cartão, criando hierarquia e personalidade.
+
+USE VETOR LUCIDE QUANDO:
+  - O ícone descreve uma ação («abra», «pause», «feche», «envie»).
+  - O ícone precisa herdar a cor do texto adjacente (hover, disabled, active).
+  - O ícone é pequeno (<= 20px) e aparece dezenas de vezes na mesma tela.
+  - O ícone indica estado (marcado, fixado, em foco) e precisa de transição
+    de cor fina.
+  - Não existe arte equivalente e vale a pena desenhar uma nova.
+
+NUNCA:
+  - Não coloque duas animações GIF competindo no mesmo slot.
+  - Não envolva uma ilustração em moldura: sem `rounded`, sem `overflow-hidden`,
+    sem `bg-*` atrás, sem `shadow`, sem `border`. A arte vai solta.
+  - Não use `multiply` (asset de fundo branco) sobre fundo escuro ou saturado:
+    passe `blend={false}`.
+  - Não adicione `playOnHover` a um tile de estatística (o movimento contínuo é
+    o que comunica "dado vivo").
+  - Não deixe `alt` com texto decorativo redundante: se o botão já tem rótulo
+    visível ou `aria-label`, use `alt=""`.
+
+================================================================================
+10. ACESSIBILIDADE E PERFORMANCE
+================================================================================
+
+10.1 PREFERÊNCIA DE MOVIMENTO REDUZIDO
+--------------------------------------------------------------------------------
+  O CSS global (@media prefers-reduced-motion) consegue zerar animações de
+  estilo, mas NÃO consegue parar um GIF — é um arquivo de imagem, não uma
+  animação CSS. Por isso o GifIcon checa a preferência em JavaScript:
+
+    usePrefersReducedMotion()  ->  isStatic = true
+
+  Quando o usuário pediu movimento reduzido:
+    - NENHUMA ilustração anima (mesmo as sempre-animadas).
+    - `playOnHover` é ignorado.
+    - Só os PNGs estáticos são exibidos.
+  A preferência é observada em tempo real: alternar o ajuste do sistema operacional
+  passa a valer imediatamente, sem recarregar a página.
+
+10.2 ACESSIBILIDADE DE TECLADO
+--------------------------------------------------------------------------------
+  - `focusin` / `focusout` no HOST acionam a mesma animação que o mouse, mas
+    apenas quando o alvo casa com `:focus-visible`. Tabular pelo menu lateral
+    mostra a animação do item focado; clicar com o mouse não.
+  - Botões com ilustração devem manter `aria-label` ou `title` (o `alt` da imagem
+    é vazio justamente para não duplicar a leitura do leitor de tela).
+  - O `title` já presente em cada botão do menu lateral cobre a descrição textual.
+  - O seletor de avatar do onboarding expõe `aria-label` e `aria-pressed` em cada
+    opção, já que a arte é o único conteúdo do botão.
+  - Em telas de toque, `pointerdown` reproduz um ciclo (seção 4.3), de modo que
+    tocar no menu lateral também dá retorno visual.
+
+10.3 PERFORMANCE
+--------------------------------------------------------------------------------
+  CUSTOS REAIS
+  - GIFs são pesados: entre 64 KB e 2,1 MB. A soma do estoque é ~6,8 MB.
+  - Um GIF sempre animado consome CPU/GPU mesmo em tamanho minúsculo na tela.
+  - Decodificar vários GIFs simultâneos em dispositivos móveis é o gargalo real.
+
+  SALVAGUARDAS IMPLEMENTADAS
+  1) PRELOAD EM IDLE
+     Só as ~13 ilustrações com `playOnHover` são pré-carregadas, e apenas no
+     requestIdleCallback. Ilustrações sempre-animadas NÃO são pré-carregadas.
+  2) LAZY LOADING
+     `loading="lazy"` por padrão: o arquivo só é baixado quando o elemento entra
+     na viewport. `tempo-total-cronometrado.gif` (2,1 MB, o maior do lote) só é
+     baixado quando a aba Jornada é aberta.
+  3) EAGER APENAS ONDE IMPORTA
+     `eager` foi aplicado só ao header, menu lateral e cabeçalho da caixa de
+     tarefas — o que está acima da dobra.
+  4) CACHE NO SERVICE WORKER
+     Os GIFs foram EXCLUÍDOS do precache (globs 'gif' fora do precache com
+     globIgnores '**/gifs/**') e entraram como rota de runtime com CacheFirst.
+     Efeito: o app instala leve e as ilustrações ficam disponíveis offline depois
+     de serem usadas uma única vez. A regra também tem expiração (60 entradas,
+     90 dias).
+
+  DICAS PARA NOVAS ILUSTRAÇÕES
+  - Prefira 256x256 para navegação/menu: o GIF fica ~4x menor.
+  - Salve o GIF com paleta reduzida: reduz muito o tamanho sem perda visível
+    em ilustrações com poucos tons.
+  - Evite inserir ilustração sempre-animada em telas que já têm 4+ loops
+    simultâneos (a tela Jornada é o limite prático atual).
+  - Se um novo GIF passar de ~600 KB, avalie usar a variante estática em slots
+    de navegação e reservar a animação para um slot de destaque.
+
+================================================================================
+11. COMO ADICIONAR UM NOVO ÍCONE (PASSO A PASSO)
+================================================================================
+
+PASSO 1 — Colocar o arquivo
+  Copie o GIF para public/gifs/<nome>.gif, em ASCII minúsculo com hífen.
+  Se já existe o PNG estático correspondente, atualize também.
+
+PASSO 2 — Rodar o script de processamento
+  É obrigatório para os ícones com `playOnHover` (menu lateral e header), senão
+  a primeira pintura do slot fica vazia. Existe um script que faz as três coisas
+  de uma vez — regenerate o frame estático, medir o fundo de todos os frames e
+  medir a duração de um ciclo:
+
+    node scripts/gif-assets.mjs
+
+  O script imprime, no final, exatamente os dois blocos que precisam ser
+  copiados para dentro de src/components/GifIcon.tsx:
+
+    WHITE_BACKDROP  -> quais assets ganham mix-blend-mode: multiply
+    LOOP_MS         -> a duração de um ciclo de cada GIF (toque do seção 4.3)
+
+  Ele exige as devDependencies do projeto:
+    npm install --legacy-peer-deps
+
+  Se preferir fazer só o frame estático, à mão:
+    node -e "const s=require('sharp');
+      s('public/gifs/<nome>.gif',{page:0})
+       .png({compressionLevel:9,palette:true})
+       .toFile('public/gifs/still/<nome>.png')"
+
+PASSO 3 — Registrar o tipo
+  Em src/components/GifIcon.tsx, acrescente o literal ao union type `GifName`:
+      | 'meu-novo-icone'
+  O TypeScript passa a garantir que o nome existe em qualquer ponto do app.
+  Se o asset tiver fundo branco, acrescente-o também a WHITE_BACKDROP.
+
+PASSO 4 — Usar
+  <GifIcon name="meu-novo-icone" className="w-6 h-6" playOnHover eager />
+  para menu/header, ou
+  <GifIcon name="meu-novo-icone" className="w-14 h-14 shrink-0" />
+  para um slot de destaque.
+
+  Se for uma MATÉRIA nova: edite o objeto CATEGORY_GIF em CategoryIcon.tsx,
+  mapeando o ícone da categoria para o nome da ilustração. Nenhum call site
+  precisa mudar.
+
+PASSO 5 — Validar
+  - Rode `node scripts/gif-assets.mjs` e confira se o asset entrou (ou não) em
+    WHITE_BACKDROP.
+  - Confira o contraste sobre o fundo real do slot. Se for escuro ou saturado,
+    passe `blend={false}`.
+  - Confirme que não há moldura: o GIF deve ser filho direto do cartão, sem
+    `rounded`, `bg-*`, `shadow` ou `overflow-hidden` intermediários.
+  - Rode npm run lint (tsc --noEmit), npm test e npm run build.
+
+================================================================================
+12. REFERÊNCIA RÁPIDA
+================================================================================
+
+COMPONENTES
+  src/components/GifIcon.tsx          GifIcon, ProfileAvatar, StudyModeBadge,
+                                     AVATAR_OPTIONS, resolveAvatarGif,
+                                     DEFAULT_AVATAR
+  src/components/CategoryIcon.tsx    CategoryIcon (único tradutor matéria -> arte)
+  scripts/gif-assets.mjs             processa/mede os assets (still, fundo, ciclo)
+
+EXPORTS DE GifIcon
+  type GifName                        união de literais com os nomes válidos
+  gifSrc(name)                        URL do GIF (ou do PNG, se estático)
+  gifStillSrc(name)                   URL do frame estático
+  resolveAvatarGif(value)             string -> GifName | null
+
+TABELAS INTERNAS DE GifIcon
+  STATIC_ONLY      assets que são PNG puro (só o foguete)
+  WHITE_BACKDROP   assets de fundo branco -> recebem mix-blend-multiply
+  LOOP_MS          duração real de um ciclo, usada no toque
+
+PROPS DO GifIcon
+  name         GifName
+  playOnHover  boolean  padrão false
+  className    string   padrão ''
+  alt          string   padrão ''
+  eager        boolean  padrão false
+  blend        boolean  padrão: automático pelo asset
+
+EVENTOS DE HOVER (ligados no HOST, não no <span>)
+  pointerenter / pointerleave / focusin / focusout / pointerdown
+  HOST_SELECTOR = 'button, a, [role="button"], [role="tab"], [data-gif-host]'
+
+VARIÁVEIS DE CSS RELEVANTES AO SLOT
+  --primary           #3B6CF5   tile primário (Nova tarefa, abas ativas)
+  --primary-soft      #EEF3FF   fundo azul suave (headers de modal)
+  --sidebar           #1E1F22   fundo do menu lateral (única superfície escura)
+  --surface           #FFFFFF   fundo dos cartões claros
+  --texto-suave       #5B6473   cor padrão de texto adjacente
+
+TRATAMENTO DE ASSET COM FUNDO BRANCO
+  mix-blend-mode: multiply na <img>, aplicado automaticamente
+  (e desfeito com blend={false} em fundo escuro)
+
+COMANDOS DE VERIFICAÇÃO
+node scripts/gif-assets.mjs  -> regenera still/ e mede fundo + ciclo
+  node scripts/gif-slow.mjs    -> aplica/confere o fator de lentidão dos GIFs
+  npm run lint    -> tsc --noEmit
+  npm test        -> vitest run
+  npm run build   -> build de produção + geração do service worker
+
+FATOR DE VELOCIDADE DOS GIFS
+  13 assets contínuos (Jornada/Dashboard/modais/avatares) rodam 2x: os delays de
+  GCE foram dobrados a nível de byte por scripts/gif-slow.mjs (sem encoder, sem
+  mudar tamanho). Os 8 assets exclusivos de hover (sidebar/header) permanecem 1x.
+  LOOP_MS em GifIcon.tsx dirige o replay de um ciclo no toque e já está dobrado
+  para os 13. Delays originais preservados em scripts/gif-delays.orig.json
+  (o script é idempotente: re-execução apenas confere).
+
+===============================================================================
+13. SINCRONIZAÇÃO EM NUVEM (SUPABASE) — NOTAS
+===============================================================================
+
+ARQUITETURA
+  src/services/supabase.ts   cliente Supabase + CloudSync (pull/push/reconcile)
+  src/services/repository.ts hook no persist()/initialize(): reconcile na
+                              inicialização, push com debounce (1,5s) a cada
+                              gravação local
+  supabase/schema.sql        tabela app_state (user_id pk, data jsonb, rev,
+                              version, updated_at) + RLS pública p/ a anon key
+  .env.example               VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+
+MODELO
+  - Snapshot único por DISPOSITIVO: user_id = UUID persistido em localStorage
+    (focosemanal_device_id). Cada navegador/instalação é um snapshot distinto.
+  - Last-write-wins por `rev` monotônico (focosemanal_cloud_rev no localStorage).
+  - Nuvem indisponível => app 100% local; o próximo persist restabelece o sync.
+  - Indicador no Header (src/components/Header.tsx): sincronizado / sincronizando/
+    offline / erro.
+
+LIMITAÇÕES CONHECIDAS
+  - Dois dispositivos com dados locais distintos: vence o de rev maior (o
+    perdedor perde as edições locais). Para multi-dispositivo real seria preciso
+    autenticação e RLS por usuário autenticado.
+  - A anon key fica embutida no cliente e o RLS está aberto a ela na tabela
+    app_state; os dados são pessoais (rotina, estudos).
+
+PROJETO SUPABASE
+  project id:  xiegypwxoovoijlkwcrb
+  url:         https://xiegypwxoovoijlkwcrb.supabase.co
+
+===============================================================================
+FocoSemanal · Guia de ícones e ilustrações.
+Documento restrito ao sistema de ícones; ver GUIA_DESIGN_HTML_CSS.txt e
+DOCUMENTACAO_COMPLETA_SISTEMA.txt para navegação, componentes e fluxos.
+================================================================================

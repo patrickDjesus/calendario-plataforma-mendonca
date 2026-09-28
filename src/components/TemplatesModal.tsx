@@ -1,8 +1,9 @@
 import React from 'react';
-import { X, Layers, Plus, Check, GraduationCap, Sun, Flame, Sparkles } from 'lucide-react';
+import { X, Plus, Check, GraduationCap, Sun, Flame, Sparkles } from 'lucide-react';
 import { DayTemplate, Category } from '../types';
 import { formatMinutesHuman } from '../utils/dateUtils';
 import { CategoryIcon } from './CategoryIcon';
+import { GifIcon } from './GifIcon';
 
 interface TemplatesModalProps {
   isOpen: boolean;
@@ -50,9 +51,7 @@ export const TemplatesModal: React.FC<TemplatesModalProps> = ({
         
         <div className="flex items-center justify-between pb-4 border-b border-[var(--borda)]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[var(--primary-soft)] text-[var(--primary)] flex items-center justify-center">
-              <Layers className="w-5 h-5" />
-            </div>
+              <GifIcon name="modelos-rotina" className="w-11 h-11 shrink-0" />
             <div>
               <h2 className="text-xl font-extrabold text-[var(--texto)]">
                 Modelos de Rotina de Estudo

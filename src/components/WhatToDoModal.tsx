@@ -109,7 +109,7 @@ export const WhatToDoModal: React.FC<WhatToDoModalProps> = ({
                       </span>
                     </div>
                   )}
-                  <span className="px-2 py-0.5 rounded uppercase font-bold text-[10px] bg-white/40 dark:bg-black/20 border border-[var(--borda)]">
+                  <span className="px-2 py-0.5 rounded uppercase font-bold text-[10px] bg-white/40 border border-[var(--borda)]">
                     {task.priority}
                   </span>
                 </div>

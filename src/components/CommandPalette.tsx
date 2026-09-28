@@ -3,8 +3,6 @@ import {
   Search, 
   Calendar, 
   Play, 
-  Moon, 
-  Sun, 
   Download, 
   CheckCircle, 
   Sparkles, 
@@ -23,7 +21,6 @@ interface CommandPaletteProps {
   categories: Category[];
   onSelectTab: (tab: string) => void;
   onStartTimer: (task: Task) => void;
-  onToggleTheme: () => void;
   onExportJSON: () => void;
   onExportICS: () => void;
   onOpenFocusMode: () => void;
@@ -37,7 +34,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   categories,
   onSelectTab,
   onStartTimer,
-  onToggleTheme,
   onExportJSON,
   onExportICS,
   onOpenFocusMode,
@@ -86,13 +82,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       subtitle: 'Distribuir tarefas equilibradas nos dias',
       icon: Sparkles,
       action: () => { onPlanWeek(); onClose(); },
-    },
-    {
-      id: 'cmd-theme',
-      title: 'Alternar Tema Claro / Escuro',
-      subtitle: 'Mudar contraste visual',
-      icon: Moon,
-      action: () => { onToggleTheme(); onClose(); },
     },
     {
       id: 'cmd-ics',

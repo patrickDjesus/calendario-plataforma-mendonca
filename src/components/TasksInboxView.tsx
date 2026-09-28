@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Inbox, 
   Search, 
   Filter, 
   Calendar, 
@@ -32,6 +31,7 @@ import {
 import { Task, Category, Priority } from '../types';
 import { formatSecondsToDigital, formatMinutesHuman, getTodayISO, addDaysToDate, getDayOfWeekLabel } from '../utils/dateUtils';
 import { CategoryIcon } from './CategoryIcon';
+import { GifIcon } from './GifIcon';
 
 interface TasksInboxViewProps {
   tasks: Task[];
@@ -332,9 +332,7 @@ export const TasksInboxView: React.FC<TasksInboxViewProps> = ({
         {/* Header Row */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[var(--primary)] text-white flex items-center justify-center shadow-xs">
-              <Inbox className="w-5 h-5" />
-            </div>
+            <GifIcon name="tarefas" className="w-11 h-11 shrink-0" eager />
             <div>
               <h2 className="text-lg sm:text-xl font-extrabold text-[var(--texto)]">Tarefas & Fluxo</h2>
               <p className="text-xs text-[var(--texto-suave)]">
@@ -391,7 +389,7 @@ export const TasksInboxView: React.FC<TasksInboxViewProps> = ({
               onClick={() => onQuickAddTask()}
               className="h-9 px-4 rounded-xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <GifIcon name="nova-tarefa" className="w-5 h-5" />
               <span className="hidden sm:inline">Nova Tarefa</span>
             </button>
           </div>
@@ -599,10 +597,10 @@ export const TasksInboxView: React.FC<TasksInboxViewProps> = ({
                                 {/* Priority Pill */}
                                 <span className={`text-xs font-bold px-2.5 py-1 rounded-lg capitalize ${
                                   task.priority === 'alta'
-                                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                                    ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
                                     : task.priority === 'media'
-                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
-                                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                    ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
+                                    : 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
                                 }`}>
                                   {task.priority === 'media' ? 'Média' : task.priority}
                                 </span>

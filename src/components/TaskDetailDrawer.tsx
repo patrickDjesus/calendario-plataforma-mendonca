@@ -402,7 +402,7 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
               onClick={handleToggleComplete}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                 currentTask.completed
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
                   : 'bg-[var(--surface-secondary)] text-[var(--texto-suave)] hover:text-[var(--texto)] border-[var(--borda)] hover:border-[var(--primary)]'
               }`}
             >
@@ -589,7 +589,7 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                   onClick={() => handleFieldChange('isTop3', !currentTask.isTop3)}
                   className={`flex-1 flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
                     currentTask.isTop3
-                      ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                      ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 '
                       : 'border-[var(--borda)] bg-[var(--surface-secondary)] text-[var(--texto-suave)] hover:text-[var(--texto)]'
                   }`}
                 >
@@ -917,7 +917,7 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                                 <div>Carga: <span className="font-bold text-[var(--texto)] tabular-nums">{ex.loadKg || 0} kg</span></div>
                                 <div>
                                   {est1RM ? (
-                                    <span className="font-bold text-amber-600 dark:text-amber-400 tabular-nums">1RM: ~{est1RM}kg</span>
+                                    <span className="font-bold text-amber-600 tabular-nums">1RM: ~{est1RM}kg</span>
                                   ) : (
                                     <span className="text-[var(--texto-muted)]">1RM: -</span>
                                   )}
@@ -975,7 +975,7 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                           } as any);
                           audioSynthesizer.playSuccessTone();
                         }}
-                        className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--borda)] text-xs font-bold hover:border-cyan-500 text-cyan-600 dark:text-cyan-400 cursor-pointer shadow-xs"
+                        className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--borda)] text-xs font-bold hover:border-cyan-500 text-cyan-600 cursor-pointer shadow-xs"
                       >
                         +250 ml (1 copo)
                       </button>
@@ -991,7 +991,7 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                           } as any);
                           audioSynthesizer.playSuccessTone();
                         }}
-                        className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--borda)] text-xs font-bold hover:border-cyan-500 text-cyan-600 dark:text-cyan-400 cursor-pointer shadow-xs"
+                        className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--borda)] text-xs font-bold hover:border-cyan-500 text-cyan-600 cursor-pointer shadow-xs"
                       >
                         +500 ml (garrafa)
                       </button>
@@ -1040,7 +1040,7 @@ export const TaskDetailDrawer: React.FC<TaskDetailDrawerProps> = ({
                                   }`}
                                 >
                                   <span>• {top.name}</span>
-                                  <span className="text-[11px] px-2 py-0.5 rounded-md bg-black/10 dark:bg-white/10 capitalize">
+                                  <span className="text-[11px] px-2 py-0.5 rounded-md bg-black/10 capitalize">
                                     {top.status.replace('_', ' ')}
                                   </span>
                                 </button>

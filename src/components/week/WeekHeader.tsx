@@ -5,11 +5,11 @@ import {
   Calendar as CalendarIcon, 
   Download, 
   Sparkles, 
-  Layers, 
   List, 
   Grid,
   ChevronDown
 } from 'lucide-react';
+import { GifIcon } from '../GifIcon';
 
 interface WeekHeaderProps {
   monthName: string;
@@ -208,7 +208,7 @@ export const WeekHeader: React.FC<WeekHeaderProps> = ({
             title="Modelos de rotina"
             className="h-9 px-3 rounded-xl border border-[var(--borda)] bg-[var(--surface-secondary)] hover:bg-[var(--surface)] text-xs font-semibold text-[var(--texto)] transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            <Layers className="w-3.5 h-3.5 text-[var(--texto-suave)]" />
+                <GifIcon name="modelos-rotina" className="w-5 h-5" playOnHover />
             <span className="hidden sm:inline">Modelos</span>
           </button>
         )}

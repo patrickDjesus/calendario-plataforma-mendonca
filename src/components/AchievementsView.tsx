@@ -16,6 +16,7 @@ import {
 import { Achievement, UserProfile, Task, Category } from '../types';
 import { calculateLevelFromXP, getLevelTitle } from '../utils/xpSystem';
 import { formatMinutesHuman } from '../utils/dateUtils';
+import { ProfileAvatar } from './GifIcon';
 
 interface AchievementsViewProps {
   achievements: Achievement[];
@@ -91,8 +92,9 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
 
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-5">
-            <div className="w-20 h-20 rounded-3xl bg-white/15 backdrop-blur-md flex items-center justify-center text-4xl shadow-inner border border-white/20">
-              {profile.avatar || '🏆'}
+            {/* Avatar solto, sem fundo/anel/borda/sombra */}
+            <div className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center">
+              <ProfileAvatar value={profile.avatar} className="w-full h-full" blend={false} />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -223,13 +225,13 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
                       isUnlocked
                         ? 'bg-gradient-to-tr from-amber-400 to-yellow-500 text-white shadow-md shadow-amber-500/30'
-                        : 'bg-slate-200 dark:bg-slate-800 text-slate-400'
+                        : 'bg-slate-200 text-slate-400'
                     }`}>
                       {getIcon(ach.icon)}
                     </div>
 
                     {isUnlocked ? (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/15 text-amber-600 border border-amber-500/30">
                         CONCLUÍDO
                       </span>
                     ) : (
@@ -249,7 +251,7 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
 
                 {/* Progress bar */}
                 <div className="mt-4 pt-3 border-t border-[var(--borda-soft)]">
-                  <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                  <div className="w-full h-1.5 rounded-full bg-slate-200 overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${
                         isUnlocked ? 'bg-amber-500' : 'bg-[var(--primary)]'

@@ -24,7 +24,7 @@ export const OverdueTasksCard: React.FC<OverdueTasksCardProps> = ({
   return (
     <div className="mb-4 p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-[var(--texto)] shadow-xs animate-fadeIn flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+        <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
           <AlertCircle className="w-4 h-4" />
         </div>
         <div>

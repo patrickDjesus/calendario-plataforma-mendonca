@@ -20,7 +20,7 @@ export const RolloverBanner: React.FC<RolloverBannerProps> = ({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         
         <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-600 flex items-center justify-center shrink-0">
             <Clock className="w-5 h-5" />
           </div>
           <div>
@@ -36,7 +36,7 @@ export const RolloverBanner: React.FC<RolloverBannerProps> = ({
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={onDismissOverdue}
-            className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-transparent hover:bg-black/5 dark:hover:bg-white/5 text-xs font-bold text-[var(--texto-suave)] hover:text-[var(--texto)] transition-colors cursor-pointer"
+            className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-transparent hover:bg-black/5 text-xs font-bold text-[var(--texto-suave)] hover:text-[var(--texto)] transition-colors cursor-pointer"
           >
             Manter onde estão
           </button>

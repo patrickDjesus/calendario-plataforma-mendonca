@@ -163,7 +163,7 @@ export const FlashcardsModal: React.FC<FlashcardsModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleGrade(1)}
-                        className="py-2.5 px-1 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 text-xs font-bold transition-all cursor-pointer"
+                        className="py-2.5 px-1 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/30 text-xs font-bold transition-all cursor-pointer"
                       >
                         <div>Errei</div>
                         <div className="text-[9px] font-normal opacity-80">(1 dia)</div>
@@ -171,7 +171,7 @@ export const FlashcardsModal: React.FC<FlashcardsModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleGrade(3)}
-                        className="py-2.5 px-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-xs font-bold transition-all cursor-pointer"
+                        className="py-2.5 px-1 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 border border-amber-500/30 text-xs font-bold transition-all cursor-pointer"
                       >
                         <div>Difícil</div>
                         <div className="text-[9px] font-normal opacity-80">(curto)</div>
@@ -179,7 +179,7 @@ export const FlashcardsModal: React.FC<FlashcardsModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleGrade(4)}
-                        className="py-2.5 px-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all cursor-pointer"
+                        className="py-2.5 px-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border border-emerald-500/30 text-xs font-bold transition-all cursor-pointer"
                       >
                         <div>Bom</div>
                         <div className="text-[9px] font-normal opacity-80">(médio)</div>

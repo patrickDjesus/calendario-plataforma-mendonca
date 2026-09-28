@@ -250,10 +250,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const durationShortcuts = [15, 30, 45, 60, 90];
 
   const prioritiesList: Array<{ id: Priority; label: string; dotColor: string; activeStyle: string }> = [
-    { id: 'baixa', label: 'Baixa', dotColor: 'bg-emerald-500', activeStyle: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' },
-    { id: 'media', label: 'Média', dotColor: 'bg-amber-500', activeStyle: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30' },
-    { id: 'alta', label: 'Alta', dotColor: 'bg-orange-500', activeStyle: 'bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/30' },
-    { id: 'urgente', label: 'Urgente', dotColor: 'bg-rose-500', activeStyle: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30' },
+    { id: 'baixa', label: 'Baixa', dotColor: 'bg-emerald-500', activeStyle: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30' },
+    { id: 'media', label: 'Média', dotColor: 'bg-amber-500', activeStyle: 'bg-amber-500/10 text-amber-700 border-amber-500/30' },
+    { id: 'alta', label: 'Alta', dotColor: 'bg-orange-500', activeStyle: 'bg-orange-500/10 text-orange-700 border-orange-500/30' },
+    { id: 'urgente', label: 'Urgente', dotColor: 'bg-rose-500', activeStyle: 'bg-rose-500/10 text-rose-700 border-rose-500/30' },
   ];
 
   const isTitleInvalid = hasAttemptedSubmit && !title.trim();

@@ -1,7 +1,11 @@
 @import "tailwindcss";
 
+/* O aplicativo e exclusivamente claro: sem `prefers-color-scheme: dark`, sem
+   variante `dark:`. A unica superficie escura e a Sidebar (--sidebar). */
 @layer base {
   :root {
+    color-scheme: light;
+
     --bg: #F3F5F9;
     --surface: #FFFFFF;
     --surface-secondary: #F8FAFC;
@@ -25,29 +29,6 @@
     
     --shadow-card: 0 8px 30px rgba(20, 30, 60, 0.06);
     --shadow-subtle: 0 4px 16px rgba(20, 30, 60, 0.04);
-  }
-
-  .dark {
-    --bg: #0E1117;
-    --surface: #181C26;
-    --surface-secondary: #202636;
-    --sidebar: #11141D;
-    --sidebar-surface: #222938;
-    --primary: #3B6CF5;
-    --primary-hover: #2B57DE;
-    --primary-soft: #1E2845;
-    --primary-text-on-soft: #6A96FE;
-    --primary-accent: #4D7CFE;
-    --primary-glow: rgba(77, 124, 254, 0.25);
-    --texto: #F8FAFC;
-    --texto-suave: #A0ABC0;
-    --texto-muted: #8B97AB;
-    --borda: #283145;
-    --borda-soft: #1E2536;
-    --track-gray: #262E40;
-    
-    --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.40);
-    --shadow-subtle: 0 4px 16px rgba(0, 0, 0, 0.25);
   }
 
   body {

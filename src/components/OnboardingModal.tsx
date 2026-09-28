@@ -3,6 +3,7 @@ import { Sparkles, ArrowRight, Check, BookOpen, User, Zap, Flame, Shield } from 
 import { StudyMode } from '../types';
 import { STUDY_MODES } from '../utils/xpSystem';
 import { APP_NAME } from '../constants/app';
+import { AVATAR_OPTIONS, GifIcon, StudyModeBadge } from './GifIcon';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 }) => {
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
-  const [avatar, setAvatar] = useState('🚀');
+  const [avatar, setAvatar] = useState<string>('avatar-homem');
   const [studyMode, setStudyMode] = useState<StudyMode>('regular');
   const [loadSampleTasks, setLoadSampleTasks] = useState(false);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([
@@ -30,7 +31,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
   if (!isOpen) return null;
 
-  const avatars = ['🚀', '🎓', '⚡', '🧠', '🦉', '🎯', '🔥', '📚'];
+  const avatars = AVATAR_OPTIONS;
 
   const availableSubjects = [
     'Linguagens & Redação', 'História / Humanas', 'Química & Biologia',
@@ -70,7 +71,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     ? 'w-8 bg-[var(--primary)]'
                     : s < step
                     ? 'w-4 bg-emerald-500'
-                    : 'w-4 bg-slate-200 dark:bg-slate-800'
+                    : 'w-4 bg-slate-200 '
                 }`}
               />
             ))}
@@ -116,13 +117,15 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     key={av}
                     type="button"
                     onClick={() => setAvatar(av)}
-                    className={`h-12 rounded-2xl text-2xl flex items-center justify-center transition-all cursor-pointer ${
+                    aria-label={`Avatar ${av}`}
+                    aria-pressed={avatar === av}
+                    className={`h-14 flex items-center justify-center transition-all cursor-pointer ${
                       avatar === av
-                        ? 'bg-[var(--primary-soft)] border-2 border-[var(--primary)] scale-110 shadow-md'
-                        : 'bg-[var(--surface-secondary)] hover:bg-[var(--borda)] border border-transparent'
+                        ? 'ring-2 ring-[var(--primary)] rounded-2xl scale-110'
+                        : 'opacity-70 hover:opacity-100 rounded-2xl'
                     }`}
                   >
-                    {av}
+                    <GifIcon name={av} className="w-11 h-11" playOnHover />
                   </button>
                 ))}
               </div>
@@ -168,7 +171,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                     }`}
                   >
                     <div className="flex items-center gap-3.5">
-                      <span className="text-3xl">{conf.badge}</span>
+                      <StudyModeBadge badge={conf.badge} className="w-8 h-8" />
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-extrabold text-[var(--texto)]">{conf.name}</span>

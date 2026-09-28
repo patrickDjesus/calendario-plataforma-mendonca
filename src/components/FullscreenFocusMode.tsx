@@ -9,7 +9,6 @@ import {
   Maximize2, 
   Minimize2, 
   RotateCcw, 
-  CloudRain, 
   Waves, 
   Wind, 
   Headphones, 
@@ -26,6 +25,7 @@ import { formatSecondsToDigital, formatMinutesHuman } from '../utils/dateUtils';
 import { audioSynthesizer } from '../services/audioSynthesizer';
 import { repository } from '../services/repository';
 import { CategoryIcon } from './CategoryIcon';
+import { GifIcon } from './GifIcon';
 
 interface FullscreenFocusModeProps {
   isOpen: boolean;
@@ -155,15 +155,15 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0B0F19] text-white flex flex-col justify-between p-6 sm:p-10 select-none overflow-hidden animate-fadeIn">
+    <div className="fixed inset-0 z-50 bg-[#F3F6FA] text-[#0F172A] flex flex-col justify-between p-6 sm:p-10 select-none overflow-hidden animate-fadeIn">
       
-      {/* Dynamic atmospheric background gradient */}
+      {/* Dynamic atmospheric background gradient (light) */}
       <div 
-        className="absolute inset-0 opacity-40 transition-all duration-1000 pointer-events-none"
+        className="absolute inset-0 opacity-70 transition-all duration-1000 pointer-events-none"
         style={{
           background: activeTimerRunning 
-            ? 'radial-gradient(circle at 50% 50%, rgba(59, 108, 245, 0.25) 0%, rgba(11, 15, 25, 0.95) 75%)'
-            : 'radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.15) 0%, rgba(11, 15, 25, 0.95) 75%)',
+            ? 'radial-gradient(circle at 50% 50%, rgba(59, 108, 245, 0.16) 0%, rgba(243, 246, 250, 0) 70%)'
+            : 'radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.14) 0%, rgba(243, 246, 250, 0) 70%)',
         }}
       />
 
@@ -173,21 +173,21 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
         <div className="flex items-center gap-3">
           {category && <CategoryIcon category={category} size="sm" />}
           <div>
-            <span className="text-xs font-black uppercase tracking-widest text-blue-400">
+            <span className="text-xs font-black uppercase tracking-widest text-blue-600">
               {category?.name || 'Foco'}
             </span>
-            <h2 className="text-sm font-bold text-slate-300 max-w-md truncate">
+            <h2 className="text-sm font-bold text-slate-600 max-w-md truncate">
               {activeTask.title}
             </h2>
           </div>
         </div>
 
         {/* Ambient Sound Bar */}
-        <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/15">
+        <div className="flex items-center gap-1.5 bg-white/85 backdrop-blur-md px-3 py-1.5 rounded-full border border-black/10 shadow-sm">
           <button
             onClick={() => handleAmbientChange('none')}
             className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
-              selectedAmbient === 'none' ? 'bg-white/20 text-white' : 'text-slate-400 hover:text-white'
+              selectedAmbient === 'none' ? 'bg-black/5 text-[#0F172A]' : 'text-slate-500 hover:text-[#0F172A]'
             }`}
             title="Silêncio"
           >
@@ -196,17 +196,17 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
           <button
             onClick={() => handleAmbientChange('chuva')}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
-              selectedAmbient === 'chuva' ? 'bg-blue-500 text-white' : 'text-slate-400 hover:text-white'
+              selectedAmbient === 'chuva' ? 'bg-blue-500 text-white' : 'text-slate-500 hover:text-[#0F172A]'
             }`}
             title="Chuva relaxante"
           >
-            <CloudRain className="w-3.5 h-3.5" />
+            <GifIcon name="dia-chuvoso" className="w-5 h-5" playOnHover blend={false} />
             <span className="hidden sm:inline">Chuva</span>
           </button>
           <button
             onClick={() => handleAmbientChange('cafe')}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
-              selectedAmbient === 'cafe' ? 'bg-amber-700 text-white' : 'text-slate-400 hover:text-white'
+              selectedAmbient === 'cafe' ? 'bg-amber-700 text-white' : 'text-slate-500 hover:text-[#0F172A]'
             }`}
             title="Sons de cafeteria"
           >
@@ -216,7 +216,7 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
           <button
             onClick={() => handleAmbientChange('ruido_marrom')}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
-              selectedAmbient === 'ruido_marrom' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
+              selectedAmbient === 'ruido_marrom' ? 'bg-amber-600 text-white' : 'text-slate-500 hover:text-[#0F172A]'
             }`}
             title="Ruído marrom profundo"
           >
@@ -226,7 +226,7 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
           <button
             onClick={() => handleAmbientChange('binaural')}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-colors cursor-pointer ${
-              selectedAmbient === 'binaural' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'
+              selectedAmbient === 'binaural' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-[#0F172A]'
             }`}
             title="Ondas Alfa Binaurais (10Hz)"
           >
@@ -243,7 +243,7 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
               step="0.05"
               value={ambientVolume}
               onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-              className="w-16 accent-blue-400 h-1 bg-white/20 rounded-lg cursor-pointer ml-1"
+              className="w-16 accent-blue-500 h-1 bg-black/10 rounded-lg cursor-pointer ml-1"
               title="Volume do som ambiente"
             />
           )}
@@ -256,9 +256,9 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
             type="button"
             onClick={() => setShowDistractionModal(true)}
             title="Anotar pensamento ou distração"
-            className="h-9 px-3 rounded-full bg-white/10 hover:bg-white/20 text-xs font-semibold text-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="h-9 px-3 rounded-full bg-white hover:bg-black/5 text-xs font-semibold text-slate-600 border border-black/10 flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <PenTool className="w-3.5 h-3.5 text-amber-400" />
+            <PenTool className="w-3.5 h-3.5 text-amber-500" />
             <span>Anotar distração</span>
           </button>
 
@@ -270,7 +270,7 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
             className={`h-9 px-3 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
               examMode 
                 ? 'bg-rose-500 text-white shadow-xs' 
-                : 'bg-white/10 hover:bg-white/20 text-slate-300'
+                : 'bg-white hover:bg-black/5 text-slate-600 border border-black/10'
             }`}
           >
             <ShieldAlert className="w-3.5 h-3.5" />
@@ -281,7 +281,7 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="w-9 h-9 rounded-full bg-white hover:bg-black/5 flex items-center justify-center text-slate-500 hover:text-[#0F172A] border border-black/10 transition-colors cursor-pointer"
             title="Sair do modo foco (Esc)"
           >
             <X className="w-4 h-4" />
@@ -299,7 +299,7 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
               cx="50%"
               cy="50%"
               r={radius}
-              className="text-slate-800/80"
+              className="text-slate-200"
               strokeWidth="12"
               stroke="currentColor"
               fill="transparent"
@@ -327,19 +327,19 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
 
           {/* Time & Task Inside Ring */}
           <div className="absolute flex flex-col items-center justify-center text-center px-6">
-            <span className="text-5xl sm:text-7xl font-black font-mono tracking-widest text-white tabular-nums drop-shadow-lg">
+            <span className="text-5xl sm:text-7xl font-black font-mono tracking-widest text-[#0F172A] tabular-nums">
               {formatSecondsToDigital(activeTimerElapsed)}
             </span>
             
             <div className="mt-3 flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${activeTimerRunning ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
-              <span className="text-xs uppercase font-extrabold tracking-widest text-slate-400">
+              <span className={`w-2.5 h-2.5 rounded-full ${activeTimerRunning ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'}`} />
+              <span className="text-xs uppercase font-extrabold tracking-widest text-slate-500">
                 {activeTimerRunning ? 'Hiperfoco Ativo' : 'Sessão Pausada'}
               </span>
             </div>
 
             {activeTask.estimatedMinutes && (
-              <span className="text-xs text-slate-400 mt-1 font-medium">
+              <span className="text-xs text-slate-500 mt-1 font-medium">
                 Meta: {formatMinutesHuman(activeTask.estimatedMinutes)} ({progressPercent}%)
               </span>
             )}
@@ -347,7 +347,7 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
         </div>
 
         {/* Task Title in Big Bold Typography */}
-        <h1 className="text-xl sm:text-2xl font-black text-white mt-6 max-w-2xl text-center leading-snug drop-shadow">
+        <h1 className="text-xl sm:text-2xl font-black text-[#0F172A] mt-6 max-w-2xl text-center leading-snug">
           {activeTask.title}
         </h1>
       </div>

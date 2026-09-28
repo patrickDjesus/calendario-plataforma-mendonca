@@ -1,26 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Play, 
   Pause, 
-  Square, 
-  Maximize2, 
-  Sun, 
-  Moon, 
-  Sparkles, 
   Search, 
   HelpCircle, 
-  Settings,
   ChevronDown,
-  Home,
-  CheckSquare,
-  CalendarRange,
-  Activity
+  Cloud,
+  CloudOff,
+  Loader,
 } from 'lucide-react';
-import { Task, Category, UserProfile, UserSettings } from '../types';
+
+import { Task, Category, UserProfile } from '../types';
 import { formatSecondsToDigital } from '../utils/dateUtils';
 import { CategoryIcon } from './CategoryIcon';
+import { GifIcon, GifName, ProfileAvatar } from './GifIcon';
 import { PWAInstallButton } from './PWAInstallButton';
 import { APP_NAME } from '../constants/app';
+import { cloudSync, SyncStatus } from '../services/supabase';
 
 interface HeaderProps {
   currentTab: string;
@@ -36,9 +32,7 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onOpenProfile: () => void;
   profile: UserProfile;
-  settings: UserSettings;
   categories: Category[];
-  onToggleTheme: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -55,37 +49,50 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenProfile,
   profile,
-  settings,
   categories,
-  onToggleTheme,
 }) => {
   const [isTimerExpanded, setIsTimerExpanded] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(cloudSync.getStatus());
+
+  useEffect(() => cloudSync.onChange(setSyncStatus), []);
+
+  const syncMeta: Record<SyncStatus, { icon: typeof Cloud; cls: string; label: string }> = {
+    synced: { icon: Cloud, cls: 'text-emerald-500', label: 'Nuvem sincronizada' },
+    syncing: { icon: Loader, cls: 'text-[var(--primary)] animate-spin', label: 'Sincronizando...' },
+    offline: { icon: CloudOff, cls: 'text-slate-400', label: 'Offline — usando dados locais' },
+    error: { icon: Cloud, cls: 'text-rose-500', label: 'Erro na sincronização' },
+  };
+  const SyncIcon = syncMeta[syncStatus].icon;
 
   const activeCategory = activeTask
     ? categories.find(c => c.id === activeTask.categoryId) || categories[0]
     : null;
 
-  const navItems = [
-    { id: 'hoje', label: 'Início', icon: Home },
-    { id: 'tarefas', label: 'Tarefas', icon: CheckSquare },
-    { id: 'semana', label: 'Semana', icon: CalendarRange },
-    { id: 'jornada', label: 'Jornada', icon: Activity },
+  const navItems: Array<{
+    id: string;
+    label: string;
+    gif: GifName;
+  }> = [
+    { id: 'hoje', label: 'Início', gif: 'inicio' },
+    { id: 'tarefas', label: 'Tarefas', gif: 'tarefas' },
+    { id: 'semana', label: 'Semana', gif: 'semana' },
+    { id: 'jornada', label: 'Jornada', gif: 'jornada' },
   ];
 
   return (
     <header className="sticky top-0 z-40 w-full h-[72px] bg-[var(--surface)] border-b border-[var(--borda)]">
       <div className="max-w-[1280px] mx-auto px-4 sm:px-6 h-full flex items-center justify-between gap-4">
         
-        {/* Left: Brand Logo & Single-row Navigation */}
+        {/* Left: Brand & Single-row Navigation */}
         <div className="flex items-center gap-6 lg:gap-8">
           <button 
             onClick={() => onSelectTab('hoje')} 
-            className="flex items-center gap-2.5 cursor-pointer focus:outline-none"
+            className="flex items-center gap-2.5 cursor-pointer focus:outline-none group"
+            aria-label={`${APP_NAME} — ir para o início`}
           >
-            <div className="w-9 h-9 rounded-xl bg-[var(--primary)] flex items-center justify-center text-white shadow-sm">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <span className="font-extrabold text-xl tracking-tight text-[var(--texto)]">
+            <span
+              className="font-extrabold text-xl sm:text-2xl tracking-tight bg-gradient-to-r from-[var(--primary)] via-indigo-500 to-violet-500 bg-clip-text text-transparent bg-gradient-to-r bg-[length:200%_100%] transition-[background-position] duration-700 group-hover:bg-[position:100%_0] [text-shadow:none]"
+            >
               {APP_NAME}
             </span>
           </button>
@@ -93,7 +100,6 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Desktop Navigation Links */}
           <nav className="hidden md:flex items-center gap-1.5" aria-label="Navegação Principal">
             {navItems.map((item) => {
-              const Icon = item.icon;
               const isActive = currentTab === item.id;
               return (
                 <button
@@ -105,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
                       : 'text-[var(--texto-suave)] hover:text-[var(--texto)] hover:bg-[var(--surface-secondary)]'
                   }`}
                 >
-                  <Icon className="w-5 h-5" />
+                  <GifIcon name={item.gif} className="w-6 h-6" playOnHover eager />
                   <span>{item.label}</span>
                   {isActive && (
                     <span className="absolute bottom-0 left-3 right-3 h-[3px] bg-[var(--primary)] rounded-full" />
@@ -116,7 +122,7 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
         </div>
 
-        {/* Right Actions: PWA Install, Active Timer, Search, Theme, Shortcuts, Settings, Avatar */}
+        {/* Right Actions: PWA Install, Active Timer, Search, Shortcuts, Settings, Avatar */}
         <div className="flex items-center gap-2 sm:gap-2.5">
           
           {/* In-App PWA Install */}
@@ -205,16 +211,6 @@ export const Header: React.FC<HeaderProps> = ({
             <Search className="w-5 h-5" />
           </button>
 
-          {/* Theme Toggle Button */}
-          <button
-            onClick={onToggleTheme}
-            className="w-10 h-10 rounded-xl hover:bg-[var(--surface-secondary)] text-[var(--texto-suave)] hover:text-[var(--texto)] flex items-center justify-center transition-colors cursor-pointer"
-            title="Alternar tema"
-            aria-label="Tema"
-          >
-            {settings.theme === 'dark' ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
-          </button>
-
           {/* Shortcuts Help Button */}
           <button
             onClick={onOpenShortcuts}
@@ -232,17 +228,27 @@ export const Header: React.FC<HeaderProps> = ({
             title="Configurações"
             aria-label="Ajustes"
           >
-            <Settings className="w-5 h-5" />
+            <GifIcon name="configuracao" className="w-6 h-6" playOnHover eager />
           </button>
 
-          {/* Avatar (40px) */}
+          {/* Cloud Sync Status */}
+          <div
+            className={`w-10 h-10 rounded-xl hover:bg-[var(--surface-secondary)] flex items-center justify-center transition-colors cursor-default ${syncMeta[syncStatus].cls}`}
+            title={syncMeta[syncStatus].label}
+            role="status"
+            aria-label={syncMeta[syncStatus].label}
+          >
+            <SyncIcon className="w-4 h-4" />
+          </div>
+
+          {/* Avatar: ilustracao solta, sem fundo, borda ou sombra */}
           <button
             onClick={onOpenProfile}
-            className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[var(--primary)] to-indigo-600 flex items-center justify-center text-lg text-white shadow-sm cursor-pointer hover:scale-105 transition-transform shrink-0 ml-1"
+            className="w-11 h-11 flex items-center justify-center cursor-pointer hover:scale-105 transition-transform shrink-0 ml-1"
             title={`Perfil de ${profile.name}`}
             aria-label="Perfil"
           >
-            {profile.avatar || '🎓'}
+            <ProfileAvatar value="avatar-homem" className="w-full h-full" playOnHover eager />
           </button>
 
         </div>

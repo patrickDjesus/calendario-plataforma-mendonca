@@ -1,8 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import { 
-  Flame, 
-  Trophy, 
-  Clock, 
   Calendar, 
   PieChart, 
   TrendingUp, 
@@ -14,6 +11,7 @@ import {
 import { Task, Category, UserProfile, DailyMood } from '../types';
 import { formatDateToISO, formatMinutesHuman, parseISODate, getTodayISO } from '../utils/dateUtils';
 import { CategoryIcon } from './CategoryIcon';
+import { GifIcon } from './GifIcon';
 
 interface JourneyViewProps {
   tasks: Task[];
@@ -126,10 +124,10 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
 
   const intensityColors = [
     'bg-[var(--surface-secondary)] border border-[var(--borda)]',
-    'bg-blue-300 dark:bg-blue-900/60',
-    'bg-blue-400 dark:bg-blue-700',
-    'bg-blue-600 dark:bg-blue-500',
-    'bg-blue-800 dark:bg-blue-400 shadow-sm shadow-blue-500/50',
+    'bg-blue-300 ',
+    'bg-blue-400 ',
+    'bg-blue-600 ',
+    'bg-blue-800 shadow-sm shadow-blue-500/50',
   ];
 
   return (
@@ -140,9 +138,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
         
         {/* Streak card */}
         <div className="p-5 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)] flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center font-bold">
-            <Flame className="w-6 h-6 fill-current" />
-          </div>
+          <GifIcon name="fogo-sequencia" className="w-14 h-14 shrink-0" />
           <div>
             <span className="text-2xl font-extrabold text-[var(--texto)] tabular-nums">
               {profile.streak} dias
@@ -153,9 +149,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
 
         {/* Total Focus Hours */}
         <div className="p-5 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)] flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[var(--primary-soft)] text-[var(--primary)] flex items-center justify-center font-bold">
-            <Clock className="w-6 h-6" />
-          </div>
+          <GifIcon name="tempo-total-cronometrado" className="w-14 h-14 shrink-0" />
           <div>
             <span className="text-2xl font-extrabold text-[var(--texto)] tabular-nums">
               {totalFocusHours} horas
@@ -166,9 +160,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
 
         {/* Total XP */}
         <div className="p-5 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)] flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-600 flex items-center justify-center font-bold">
-            <Zap className="w-6 h-6" />
-          </div>
+          <GifIcon name="experiencia-acumulada" className="w-14 h-14 shrink-0" />
           <div>
             <span className="text-2xl font-extrabold text-[var(--texto)] tabular-nums">
               {profile.xp} XP
@@ -179,9 +171,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
 
         {/* Completed Tasks */}
         <div className="p-5 rounded-[24px] bg-[var(--surface)] border border-[var(--borda)] shadow-[var(--shadow-card)] flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center font-bold">
-            <Trophy className="w-6 h-6" />
-          </div>
+          <GifIcon name="tarefas-concluidas" className="w-14 h-14 shrink-0" />
           <div>
             <span className="text-2xl font-extrabold text-[var(--texto)] tabular-nums">
               {tasks.filter(t => t.completed).length}
@@ -342,7 +332,7 @@ export const JourneyView: React.FC<JourneyViewProps> = ({
 
           {/* Weekly automated tip */}
           <div className="p-6 rounded-[28px] bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-blue-500/10 border border-indigo-500/20 shadow-sm">
-            <div className="flex items-center gap-2 text-xs font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-2">
+            <div className="flex items-center gap-2 text-xs font-extrabold text-indigo-600 uppercase tracking-wider mb-2">
               <Zap className="w-4 h-4" />
               <span>Dica de Alta Performance</span>
             </div>

@@ -134,10 +134,10 @@ export const DayColumn: React.FC<DayColumnProps> = ({
           const currentSpent = isCurrentActive ? activeTimerElapsed : task.spentSeconds;
 
           const priorityBadgeStyles: Record<string, string> = {
-            baixa: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
-            media: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30',
-            alta: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30',
-            urgente: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30',
+            baixa: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30',
+            media: 'bg-amber-500/10 text-amber-700 border-amber-500/30',
+            alta: 'bg-orange-500/10 text-orange-700 border-orange-500/30',
+            urgente: 'bg-rose-500/10 text-rose-700 border-rose-500/30',
           };
 
           return (
