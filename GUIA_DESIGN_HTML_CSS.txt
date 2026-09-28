@@ -1,0 +1,244 @@
+================================================================================
+GUIA COMPLETO DE DESIGN, HTML, CSS & ARQUITETURA - FOCOSEMANAL
+Cockpit de Estudos, Produtividade, Foco de Alta Precisão & Gamificação
+================================================================================
+
+1. VISÃO GERAL E FILOSOFIA DE PRODUTO
+--------------------------------------------------------------------------------
+O FocoSemanal é uma aplicação web progressiva (PWA) e cockpit de alta performance
+para organização de estudos, gestão de tempo, bloqueio de agenda (time blocking),
+gamificação motivacional e sessões imersivas de foco (Pomodoro & Foco Livre).
+
+Pilares Fundamentais:
+- Clareza e Menos Ruído: Cada componente possui uma única responsabilidade clara.
+- Hierarquia Visual Firme: Títulos e ações primárias se destacam naturalmente.
+- Ação Primária Consistente: O azul (#3B6CF5 / hover #2557EB) é a ÚNICA cor de ação 
+  interativa principal em botões, abas ativas, anéis e foco.
+- Cores Semânticas das Matérias: Aparecem exclusivamente nos tiles dos ícones e em
+  textos de identificação da matéria/categoria, evitando poluição visual.
+- Acessibilidade & Contraste Real (WCAG AA): Mínimo de 4,5:1 em todos os textos
+  (3:1 apenas em textos grandes e ícones decorativos).
+- Tipografia Rigorosa: Plus Jakarta Sans com números tabulares (tabular-nums) em
+  todos os contadores, cronômetros, datas e horários.
+- Tamanho Mínimo de Fonte: 12px (text-xs) em toda a aplicação.
+
+--------------------------------------------------------------------------------
+2. PALETA DE CORES E ESPECIFICAÇÃO DE CONTRASTE (WCAG AA)
+--------------------------------------------------------------------------------
+
+A. TEMA CLARO (:root)
+- Fundo Geral (--bg): #F3F5F9
+- Superfície Principal / Cartões (--surface): #FFFFFF (sombra suave sem borda forçada)
+- Superfície Secundária / Campos (--surface-secondary): #F8FAFC
+- Barra de Ferramentas / Sidebar (--sidebar): #1E1F22
+- Ação Primária (--primary): #3B6CF5
+- Hover da Ação Primária (--primary-hover): #2557EB
+- Fundo Azul Suave (--primary-soft): #EEF3FF
+- Texto Azul sobre Fundo Suave (--primary-text-on-soft): #2B57DE (contraste 4.8:1)
+- Texto Principal (--texto): #14161A (contraste > 12:1)
+- Texto Secundário (--texto-suave): #5B6473 (contraste > 4.6:1)
+- Texto Muted / Suporte (--texto-muted): #6B7280 (contraste > 4.5:1)
+- Bordas Gerais (--borda): #E2E6EF
+- Trilho do Anel de XP / Barras Inativas (--track-gray): #E8ECF4
+
+B. TEMA ESCURO (.dark)
+- Fundo Geral (--bg): #0E1117
+- Superfície Principal / Cartões (--surface): #181C26
+- Superfície Secundária / Campos (--surface-secondary): #202636
+- Barra Lateral / Navegação (--sidebar): #11141D
+- Ação Primária (--primary): #3B6CF5 (botões primários com texto branco)
+- Anéis, Ícones e Destaques (--primary-accent): #4D7CFE
+- Fundo Azul Suave (--primary-soft): #1E2845
+- Texto Azul sobre Fundo Suave (--primary-text-on-soft): #6A96FE
+- Texto Principal (--texto): #F8FAFC (contraste > 14:1)
+- Texto Secundário (--texto-suave): #A0ABC0 (contraste > 6.8:1)
+- Texto Muted / Suporte (--texto-muted): #8B97AB (contraste > 4.8:1)
+- Bordas Gerais (--borda): #283145
+- Trilho do Anel de XP / Barras Inativas (--track-gray): #262E40
+
+--------------------------------------------------------------------------------
+3. NAVEGAÇÃO E ABAS PRINCIPAIS
+--------------------------------------------------------------------------------
+
+1. INÍCIO (Hoje)
+   - Exibe o painel diário concentrado: boas-vindas com avatar e nível, faixa 
+     "Agora / Próximo", anel de XP do dia, tarefas do dia com entrada inteligente
+     (NLP), linha do tempo de agendamento (07h às 22h) e cartão de metas/humor.
+
+2. TAREFAS (Caixa de Entrada Geral - TasksInboxView.tsx)
+   - Central unificada para todas as tarefas sem dia definido (backlog), busca global,
+     filtros por matéria, status, prioridade e tags.
+   - Agendamento rápido em lote (Mover para Hoje, Amanhã, Próxima Semana).
+   - Gestão de itens arquivados e organização ágil.
+
+3. SEMANA (Agenda Flexível & Planejador Semanal - WeekView.tsx)
+   - Grade adaptável de 7 dias com largura mínima de 170px por coluna (a partir de 1400px
+     exibe a semana completa sem barra de rolagem horizontal).
+   - Alternância com 1 clique para Modo "Lista / Agenda Vertical" (padrão em dispositivos
+     móveis para visualização linear confortável).
+   - Arrastar e soltar (drag & drop) tarefas entre dias.
+   - Exportação direta de cronograma para Apple Calendar / Google Calendar (.ICS).
+
+4. JORNADA (Estatísticas & Analytics - JourneyView.tsx)
+   - Gráficos de horas focadas por matéria, distribuição de energia e consistência.
+   - Cálculo de ritmo e tempo médio por tarefa concluída.
+
+5. CONQUISTAS (Gamificação & Níveis - AchievementsView.tsx)
+   - Níveis de usuário (Iniciante, Focado, Mestre, etc.).
+   - Trilha de Badges desbloqueáveis por consistência, dias seguidos e tempo focado.
+   - Histórico detalhado de recompensas de XP.
+
+--------------------------------------------------------------------------------
+4. DETALHAMENTO DE COMPONENTES CHAVE
+--------------------------------------------------------------------------------
+
+A. BARRA SUPERIOR (Header.tsx - 72px)
+- Logo com gradiente moderno e nome "FocoSemanal".
+- Navegação horizontal unificada de abas.
+- Mini pill escura de cronômetro ativo: exibe tarefa em andamento, tempo decorrido
+  em tempo real com números tabulares, botão play/pause e atalho para tela cheia.
+- Botão interativo de instalação do PWA (quando disponível pelo navegador).
+- Botão de busca global rápida (Ctrl + K).
+- Alternador de tema Claro / Escuro.
+- Menu de ajuda com atalhos de teclado (tecla ?).
+- Botão de Ajustes e Avatar do usuário.
+
+B. BARRA LATERAL RÁPIDA (Sidebar.tsx - 96px)
+- Centraliza os atalhos de ferramentas mais utilizadas:
+  1. Nova Tarefa (+)
+  2. Foco Livre (Cronômetro avulso)
+  3. Modo Foco (Tela cheia imersiva)
+  4. Fechar o Dia (Ritual de encerramento noturno)
+  5. Modelos (Rotinas prontas para aplicar)
+  6. Revisões (Repetição espaçada / Spaced Repetition)
+  7. Lixeira (Soft-delete com 30 dias de recuperação segura)
+  8. Ajustes (Configurações consolidadas em um único modal)
+
+C. CARTÃO DE BOAS-VINDAS & MODOS DE ESTUDO (WelcomeCard.tsx)
+- Saudação dinâmica com data formatada por extenso.
+- Avatar com insígnia de nível e barra de progresso para o próximo nível.
+- Sequência de dias consecutivos estudados (Streak).
+- Seletor do Modo de Estudo com metas de XP padronizadas em todo o sistema:
+  * Leve: 200 XP / dia
+  * Regular: 400 XP / dia
+  * Intenso: 600 XP / dia
+- Botão de ação rápida "Comece por aqui" que foca diretamente no SmartInputBar.
+
+D. FAIXA "AGORA / PRÓXIMO" (NowNextBar.tsx)
+- Fica posicionada no topo da visão Início.
+- Quando há cronômetro ativo: exibe "EM FOCO AGORA", o nome da tarefa, matéria e
+  botão de pausar ou concluir.
+- Quando ocioso: exibe "PRÓXIMO RECOMENDADO" sugerindo a tarefa de maior prioridade
+  (Top 3 ou com horário mais próximo) com botão de 1 clique para iniciar o foco.
+
+E. PAINEL DO DIA & ENTRADA INTELIGENTE (DayDashboard.tsx)
+- Coluna 1 (XP Diário): Anel SVG circular de 220px com preenchimento animado,
+  porcentagem da meta diária, mensagem motivacional e botão para focar.
+- Coluna 2 (Tarefas do Dia):
+  * SmartInputBar: processamento em linguagem natural (NLP). Permite digitar 
+    "Física amanhã 14:00 45m #enem !alta" para preencher data, hora, tempo, tag
+    e prioridade automaticamente.
+  * Filtros de status (Todas, Pendentes, Concluídas).
+  * Lista de tarefas com reordenação, timer individual e menu de ações rápidas.
+- Coluna 3 (Metas & Humor):
+  * 3 barras de progresso (Tarefas concluídas, Horas focadas, Top 3 do dia).
+  * Seletor de humor diário: 5 emojis com rótulos semânticos completos
+    (Ótima 😄, Boa 🙂, Normal 😐, Cansado 😫, Difícil 😞).
+
+F. LINHA DO TEMPO DO DIA & TIME BLOCKING (DailyTimeline.tsx)
+- Grade horária detalhada cobrindo das 07:00 às 22:00.
+- Arrastar tarefas diretamente para horários livres.
+- Detecção em tempo real de sobreposição de horários com alerta visual de conflito.
+
+G. MODAL DE NOVA TAREFA / EDIÇÃO (TaskModal.tsx - REFATORADO)
+- Estrutura: Max-width 560px, cantos arredondados (20px), cabeçalho fixo, corpo
+  com rolagem interna suave e rodapé fixo (sticky).
+- Campo Título: 52px de altura, fonte 16px semibold, auto-foco e mensagem de erro inline.
+- Categoria: Chips responsivos em flex-wrap (sem truncar texto), ícone em tile
+  colorido e seleção nítida em azul primário.
+- Prioridade: Segmented control elegante com pílulas suaves para Baixa (verde),
+  Média (âmbar) e Alta (rose).
+- Linha "Quando & Duração": Grid de 3 colunas (Data, Horário opcional e Tempo
+  estimado com números tabulares e ícones nativos) + atalhos rápidos (15m, 30m, 45m, 60m, 90m).
+- Switches Acessíveis: Toggles com role="switch" e animação suave para "Top 3 do dia (+XP)"
+  e "Fixar no topo".
+- Seção Expansível "Mais Opções":
+  * Acordeom animado que exibe resumo e contador de itens quando fechado.
+  * Abre automaticamente se a tarefa possuir dados secundários ao editar.
+  * Contém: Detalhes/Resumo em textarea expansível, Repetição por dias da semana
+    (chips Seg-Dom de 36px), Subtarefas/Checklist com adicionar e remover, e Tags
+    geradas como chips interativos com remoção individual.
+- Rodapé Fixo: Botão Cancelar (ghost) e Botão Criar/Salvar (44px em azul #3B6CF5) com
+  dica de atalho de teclado `Ctrl + ↵` / `⌘ + Enter`.
+- Acessibilidade: Focus trap (foco preso), fechamento com tecla Escape, retorno
+  de foco para o botão acionador e layout responsivo tipo bottom-sheet em telas móveis.
+
+H. MODO FOCO EM TELA CHEIA (FullscreenFocusMode.tsx)
+- Interface zen sem distrações com cronômetro grande centralizado.
+- Controles de Pomodoro (25/5 min ou tempo customizado).
+- Sons ambientes embutidos (Chuva suave, Ruído branco, Café/Ambiente, Floresta).
+- Atalho para abrir o Mini Cronômetro Flutuante.
+
+I. MINI CRONÔMETRO FLUTUANTE & PICTURE-IN-PICTURE (FloatingMiniTimer.tsx)
+- Suporte nativo à API Document Picture-in-Picture do navegador para flutuar fora
+  da aba sobre outros aplicativos enquanto estuda.
+- Widget flutuante de canto alternativo com controles de play/pause e conclusão.
+
+J. FECHAR O DIA (CloseDayModal.tsx)
+- Ritual de fechamento noturno: resumo de horas estudadas e XP total adquirido.
+- Registro do humor do dia.
+- Gestão em lote de tarefas pendentes: mover para hoje, reagendar para amanhã ou descartar.
+- Sugestão e definição da "1ª tarefa de amanhã" para eliminar a fricção matinal.
+
+K. FOCO LIVRE (FreeFocusModal.tsx)
+- Cronômetro independente para sessões de estudo sem tarefa pré-definida.
+- Ao pausar/finalizar, permite atribuir nome, matéria, notas de reflexão e converter
+  automaticamente os minutos em XP.
+
+L. DETECÇÃO DE INATIVIDADE & NOTA RÁPIDA (InactivityPromptModal.tsx)
+- Detecção automática de inatividade durante sessões longas de foco.
+- Pergunta suave: "Ainda está nessa tarefa?" para evitar cronômetros esquecidos.
+- Modal de nota reflexiva ao concluir/pausar para consolidar o aprendizado.
+
+M. ONBOARDING GUIADO EM 3 PASSOS (OnboardingModal.tsx)
+- Passo 1: Nome e preferências do estudante.
+- Passo 2: Escolha do Modo de Estudo (Leve, Regular, Intenso) com cálculo de meta.
+- Passo 3: Matérias e rotina inicial, com opção de carregar tarefas de exemplo
+  removíveis com 1 clique.
+
+--------------------------------------------------------------------------------
+5. PROGRESSIVE WEB APP (PWA) & OFFLINE
+--------------------------------------------------------------------------------
+- Manifest completo (/public/manifest.json) com theme_color (#3B6CF5 e #181C26).
+- Ícones em alta resolução (192x192, 512x512 e ícones mascaráveis para Android).
+- Service Worker (/public/sw.js) com estratégia de cache offline para permitir
+  uso sem conexão com a internet.
+- Hook reativo `usePWAInstall.ts` para disparar o prompt de instalação nativo no
+  computador, tablet ou smartphone.
+- Indicador visual discreto de status offline quando a conexão for interrompida.
+
+--------------------------------------------------------------------------------
+6. ATALHOS DE TECLADO SUPORTADOS
+--------------------------------------------------------------------------------
+- N: Abrir modal de Nova Tarefa
+- F: Abrir Modo Foco em Tela Cheia
+- Espaço: Iniciar / Pausar cronômetro da tarefa ativa
+- Ctrl + K / ⌘ + K: Focar na barra de busca global
+- Ctrl + Enter / ⌘ + Enter: Salvar formulário no modal de tarefa
+- Esc: Fechar qualquer modal aberto e retornar foco
+- ?: Abrir painel de ajuda e atalhos
+
+--------------------------------------------------------------------------------
+7. ACESSIBILIDADE & PREFERÊNCIAS DO SISTEMA
+--------------------------------------------------------------------------------
+- Suporte total a `prefers-reduced-motion` no CSS para desativar animações em
+  usuários sensíveis a movimento.
+- Foco visível (`ring-2 ring-[var(--primary)] ring-offset-2`) em todos os elementos
+  interativos via navegação por teclado (Tab / Shift + Tab).
+- Elementos semânticos HTML5 (`role="dialog"`, `role="switch"`, `aria-expanded`,
+  `aria-modal="true"`, `aria-labelledby`).
+- Favicon dinâmico sincronizado em tempo real com o estado do cronômetro.
+
+================================================================================
+FocoSemanal · Documentação atualizada e sincronizada com a versão de produção.
+================================================================================

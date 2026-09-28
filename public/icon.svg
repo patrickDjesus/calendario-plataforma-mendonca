@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="pwaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B6CF5" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="100%" stop-color="#38BDF8" />
+    </linearGradient>
+  </defs>
+  <!-- Background with rounded squircle -->
+  <rect width="512" height="512" rx="128" fill="url(#pwaGrad)"/>
+  
+  <!-- Outer Focus Ring -->
+  <circle cx="256" cy="256" r="170" fill="none" stroke="rgba(255, 255, 255, 0.15)" stroke-width="24"/>
+  
+  <!-- Dynamic Arc (75% completed) -->
+  <circle cx="256" cy="256" r="170" fill="none" stroke="url(#glowGrad)" stroke-width="24" stroke-linecap="round" stroke-dasharray="1068" stroke-dashoffset="267" transform="rotate(-90 256 256)"/>
+  
+  <!-- Center Lightning Bolt (Foco & Energia) -->
+  <path d="M276 136L186 276H260L236 376L326 236H252L276 136Z" fill="#FFFFFF" filter="drop-shadow(0 8px 16px rgba(0,0,0,0.2))"/>
+</svg>

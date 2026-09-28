@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg: #F3F5F9;
+    --surface: #FFFFFF;
+    --surface-secondary: #F8FAFC;
+    --sidebar: #1E1F22;
+    --sidebar-surface: #2B2D31;
+    --primary: #3B6CF5;
+    --primary-hover: #2557EB;
+    --primary-soft: #EEF3FF;
+    --primary-text-on-soft: #2B57DE;
+    --primary-glow: rgba(59, 108, 245, 0.20);
+    --texto: #14161A;
+    --texto-suave: #5B6473;
+    --texto-muted: #6B7280;
+    --borda: #E2E6EF;
+    --borda-soft: #EEF2F7;
+    --track-gray: #E8ECF4;
+    
+    --radius-sm: 12px;
+    --radius-md: 20px;
+    --radius-lg: 24px;
+    
+    --shadow-card: 0 8px 30px rgba(20, 30, 60, 0.06);
+    --shadow-subtle: 0 4px 16px rgba(20, 30, 60, 0.04);
+  }
+
+  .dark {
+    --bg: #0E1117;
+    --surface: #181C26;
+    --surface-secondary: #202636;
+    --sidebar: #11141D;
+    --sidebar-surface: #222938;
+    --primary: #3B6CF5;
+    --primary-hover: #2B57DE;
+    --primary-soft: #1E2845;
+    --primary-text-on-soft: #6A96FE;
+    --primary-accent: #4D7CFE;
+    --primary-glow: rgba(77, 124, 254, 0.25);
+    --texto: #F8FAFC;
+    --texto-suave: #A0ABC0;
+    --texto-muted: #8B97AB;
+    --borda: #283145;
+    --borda-soft: #1E2536;
+    --track-gray: #262E40;
+    
+    --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.40);
+    --shadow-subtle: 0 4px 16px rgba(0, 0, 0, 0.25);
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--texto);
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--borda);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--texto-muted);
+}
+
+/* Pulse glow for active running timer */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 12px var(--primary-glow);
+  }
+  50% {
+    box-shadow: 0 0 24px var(--primary-glow), 0 0 8px var(--primary);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.5s infinite ease-in-out;
+}
+
+/* Checkbox check animation */
+@keyframes checkDraw {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.check-icon-animated {
+  stroke-dasharray: 24;
+  animation: checkDraw 0.2s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+/* Modal animation */
+@keyframes modalScale {
+  0% {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal {
+  animation: modalScale 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Accessibility: prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

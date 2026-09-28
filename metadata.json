@@ -1,0 +1,6 @@
+{
+  "name": "Plataforma Mendonça - Cockpit de Estudos e Produtividade",
+  "description": "Planejamento de estudos, tarefas com prioridades, cronômetro integrado por tarefa e modo foco com estatísticas em tempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

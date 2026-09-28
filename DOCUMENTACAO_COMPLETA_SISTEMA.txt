@@ -1,0 +1,469 @@
+================================================================================
+DOCUMENTAÇÃO COMPLETA DE ENGENHARIA, DESIGN, HTML, CSS E FUNCIONALIDADES
+SISTEMA: FOCOSEMANAL — PLATAFORMA DE ESTUDOS, PRODUTIVIDADE & ALTO DESEMPENHO
+================================================================================
+Versão do Sistema: 3.2.0 (Fases 1, 2, 3A e 3B Concluídas)
+Stack Tecnológica: React 19, TypeScript 5.5, Tailwind CSS, Vite, Web Audio API, PWA
+Armazenamento: LocalStorage com versionamento de Schema, migração reativa e backup JSON
+
+--------------------------------------------------------------------------------
+ÍNDICE GERAL
+--------------------------------------------------------------------------------
+1. VISÃO GERAL E FILOSOFIA DE ARQUITETURA
+2. DESIGN SYSTEM COMPLETO (HTML, CSS, VARIÁVEIS, TIPOGRAFIA E WCAG AA)
+3. MODELO DE DADOS E CONTRATOS TYPESCRIPT (TYPES.TS)
+4. REPOSITÓRIO, PERSISTÊNCIA E MIGRAÇÕES (REPOSITORY.TS)
+5. MOTOR DE ÁUDIO SINTETIZADO (AUDIO.TS)
+6. MOTOR DE PROCESSAMENTO DE LINGUAGEM NATURAL (NLPPARSER.TS)
+7. COMPONENTES DE INTERFACE E FLUXOS DE USUÁRIO:
+   7.1. BARRA SUPERIOR (HEADER.TSX)
+   7.2. BARRA LATERAL E NAVEGAÇÃO (SIDEBAR.TSX)
+   7.3. CARTÃO DE BOAS-VINDAS E BARRA AGORA/PRÓXIMO (WELCOMECARD & NOWNEXTBAR)
+   7.4. CAIXA DE ENTRADA ESTILO ASANA (TASKSINBOXVIEW.TSX)
+   7.5. PAINEL LATERAL DE DETALHES (TASKDETAILDRAWER.TSX)
+   7.6. GRADE CURRICULAR E CONTEÚDOS DAS MATÉRIAS (SUBJECTSCURRICULUMMODAL.TSX)
+   7.7. VISÃO SEMANAL E CALENDÁRIO (WEEKVIEW.TSX)
+   7.8. CRONÔMETRO IMERSIVO E POMODORO (POMODOROMODAL.TSX & FLOATINGMINITIMER.TSX)
+   7.9. MODAIS COMPLEMENTARES (SETTINGS, WHAT-TO-DO, TEMPLATES, PLAN-WEEK, ONBOARDING)
+8. FASE 3A EM DETALHES: MÓDULO DE TREINO, SAÚDE E HÁBITOS
+9. FASE 3B EM DETALHES: MÓDULO DE MATÉRIAS, ÁRVORE DE TÓPICOS E REPETIÇÃO ESPAÇADA
+10. SISTEMA DE GAMIFICAÇÃO, XP, NÍVEIS E MODOS DE ESTUDO
+11. ATALHOS DE TECLADO E ACESSIBILIDADE UNIVERSAL
+12. RESUMO DE ARQUIVOS DO PROJETO
+
+================================================================================
+1. VISÃO GERAL E FILOSOFIA DE ARQUITETURA
+================================================================================
+O FocoSemanal foi concebido como uma estação de trabalho completa (cockpit) voltada
+para estudantes, concurseiros e profissionais de alta performance.
+
+Princípios Chave:
+- Zero Dependências Pesadas: Nada de bibliotecas de UI infladas ou runtimes externos;
+  o layout é construído com Tailwind CSS puro e ícones vetoriais leves (Lucide Icons).
+- Reatividade e Estado Centralizado: Toda a persistência é gerenciada através de um
+  repositório tipado com eventos de sincronização em tempo real e tratamento de migração
+  de dados retrocompatível.
+- Foco Cognitivo Rigoroso: Redução drástica de ruído visual. Elementos de ação usam
+  estritamente o azul de sistema (#3B6CF5). Cores personalizadas de categorias são
+  isoladas exclusivamente no tile do ícone e no texto identificador da matéria.
+- Resiliência Offline e PWA: Funciona integralmente offline no navegador através de
+  LocalStorage e Service Worker registrado.
+
+================================================================================
+2. DESIGN SYSTEM COMPLETO (HTML, CSS, VARIÁVEIS, TIPOGRAFIA E WCAG AA)
+================================================================================
+
+2.1. ESTRUTURA HTML (INDEX.HTML):
+- Viewport: <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+- Tipografia Importada: Google Fonts "Plus Jakarta Sans" com pesos 400, 500, 600, 700 e 800.
+- Tema Dinâmico: <meta name="theme-color" content="#181C26" media="(prefers-color-scheme: dark)" />
+- PWA Manifest: manifesto web integrado com suporte a instalação na tela inicial.
+
+2.2. TOKENS DE CSS GLOBAL E VARIÁVEIS (:root e .dark em src/index.css):
+
+A. TEMA CLARO (:root):
+  --bg: #F3F5F9                     /* Fundo geral da aplicação */
+  --surface: #FFFFFF                /* Superfície dos cartões e modais */
+  --surface-secondary: #F8FAFC      /* Superfície de campos de formulário e inputs */
+  --surface-card: #FFFFFF           /* Cartões elevados */
+  --surface-muted: #F1F4F9          /* Fundos inativos ou secundários */
+  --sidebar: #1E1F22                /* Sidebar escura de alto contraste */
+  --primary: #3B6CF5                /* Única cor de ação primária do sistema */
+  --primary-hover: #2557EB          /* Estado hover de botões primários */
+  --primary-soft: #EEF3FF           /* Fundo suave para botões secundários ativos */
+  --primary-text-on-soft: #2B57DE   /* Texto legível com contraste 4.8:1 sobre fundo suave */
+  --texto: #14161A                  /* Texto de títulos e corpo principal (contraste > 12:1) */
+  --texto-suave: #5B6473            /* Texto secundário (contraste > 4.6:1 WCAG AA) */
+  --texto-muted: #6B7280            /* Rótulos e metadados auxiliares (contraste > 4.5:1) */
+  --borda: #E2E6EF                  /* Linhas divisórias e contornos principais */
+  --borda-suave: #EDF0F7            /* Bordas internas secundárias */
+  --track-gray: #E8ECF4             /* Trilho cinza para barras de progresso inativas */
+
+B. TEMA ESCURO (.dark):
+  --bg: #0E1117                     /* Fundo profundo */
+  --surface: #181C26                /* Superfície de cards, painéis e gavetas */
+  --surface-secondary: #202636      /* Fundo de inputs e caixas de seleção */
+  --surface-card: #181C26           /* Cartões elevados escuros */
+  --surface-muted: #1F2637          /* Trilhas e elementos desabilitados */
+  --sidebar: #11141D                /* Sidebar profunda */
+  --primary: #3B6CF5                /* Azul vibrante com excelente leitura */
+  --primary-hover: #4D7CFE          /* Hover azul claro */
+  --primary-accent: #4D7CFE         /* Realce para anéis e ícones de ação */
+  --primary-soft: #1E2845           /* Fundo azul suave escuro */
+  --primary-text-on-soft: #6A96FE   /* Texto de alto contraste sobre o azul suave */
+  --texto: #F8FAFC                  /* Texto quase branco (contraste > 14:1) */
+  --texto-suave: #A0ABC0            /* Texto secundário escuro (contraste > 6.8:1) */
+  --texto-muted: #8B97AB            /* Rótulos auxiliares escuros (contraste > 4.8:1) */
+  --borda: #283145                  /* Bordas de separação */
+  --borda-suave: #1F2738            /* Bordas suaves */
+  --track-gray: #262E40             /* Trilho inativo de progresso */
+
+2.3. REGRAS INVIOLÁVEIS DE DESIGN:
+1. Fonte Mínima: 12px (text-xs = 0.75rem / 12px com line-height proporcional). Nunca usar fontes de 10px ou 11px ilegíveis.
+2. Tabular Nums: Todo contador, relógio, cronômetro, porcentagem ou campo numérico DEVE conter a classe CSS `tabular-nums` para evitar oscilação visual de largura.
+3. Isolamento de Cores de Matéria: As cores de categoria (ex: roxo, verde, laranja, ciano) são permitidas EXCLUSIVAMENTE dentro do quadradinho de ícone da categoria (`CategoryIcon`) e na cor da fonte do texto do selo. Botões de ação, fundos inteiros de cards e seletores de página utilizam a cor azul do sistema (`#3B6CF5`).
+4. Altura e Raios Padronizados:
+   - Campos de input e botões principais: altura de 44px (touch target mínimo para conformidade móvel).
+   - Raios de cantos: `rounded-xl` (12px) para cartões internos e inputs; `rounded-2xl` (16px) para modais e containers maiores; `rounded-full` para badges e avatares.
+   - Espaçamento: grade modular baseada em múltiplos de 8px (p-2 = 8px, p-4 = 16px, p-6 = 24px, gap-4 = 16px).
+5. Acessibilidade (a11y):
+   - Todos os modais fecham universalmente com a tecla `Escape`.
+   - Focus traps implementados para impedir que a tecla Tab escape para o fundo.
+   - Respeito à preferência de redução de movimento do sistema (`prefers-reduced-motion: reduce`).
+
+================================================================================
+3. MODELO DE DADOS E CONTRATOS TYPESCRIPT (TYPES.TS)
+================================================================================
+
+O sistema utiliza tipagem estrita para todas as entidades:
+
+3.1. CATEGORIAS E CONFIGURAÇÕES DO USUÁRIO:
+- CategoryId: 'cat-estudo' | 'cat-trabalho' | 'cat-treino' | 'cat-pessoal' | string (customizável).
+- Category: { id, name, color, icon, isCustom? }
+- StudyModeId: 'padrao' | 'concurso' | 'vestibular' | 'faculdade' | 'trabalho' | 'habito'
+- StudyMode: { id, name, description, icon, dailyXpGoal, taskBaseXp, minuteBaseXp, streakMultiplierBonus }
+- UserSettings: {
+    name: string;
+    avatar: string;
+    mode: StudyModeId;
+    theme: 'claro' | 'escuro' | 'sistema';
+    pomodoro: { focusMinutes, shortBreakMinutes, longBreakMinutes, longBreakInterval, autoStartBreaks, autoStartPomodoros, soundEnabled, soundVolume };
+    soundEnabled: boolean;
+    weekStartsOn: 0 | 1;
+    dailyGoalMinutes: number;
+    showCompletedTasks: boolean;
+    compactView: boolean;
+  }
+
+3.2. TAREFAS, SUBTAREFAS E HISTÓRICO:
+- Priority: 'baixa' | 'media' | 'alta' | 'urgente'
+- TaskStatus: 'pendente' | 'em_andamento' | 'concluida' | 'cancelada'
+- SubTask: { id, title, completed, estimatedMinutes? }
+- TaskHistoryEntry: { id, timestamp, type: 'criacao' | 'edicao' | 'conclusao' | 'tempo_adicionado' | 'status_alterado', description }
+- Task: {
+    id: string;
+    title: string;
+    description?: string;
+    categoryId: CategoryId;
+    date: string;                  // Formato YYYY-MM-DD
+    time?: string;                  // Formato HH:MM
+    priority: Priority;
+    status: TaskStatus;
+    estimatedMinutes: number;
+    actualMinutes: number;
+    tags: string[];
+    subtasks: SubTask[];
+    history: TaskHistoryEntry[];
+    attachments?: { id, title, url, type }[];
+    details?: WorkoutDetails | CardioDetails | StudyDetails; // Extensão Fases 3A e 3B
+  }
+
+3.3. FASE 3A — CONTRATOS DE TREINO, CARDIO E SAÚDE:
+- ExerciseItem: {
+    id: string;
+    name: string;
+    sets: number;
+    reps: number;
+    loadKg: number;
+    restSec: number;
+    notes?: string;
+    setsDone: boolean[];           // Checklist por série individual
+    lastPerformance?: string;       // Histórico ("Última vez: 3x10 com 40kg")
+  }
+- WorkoutDetails: {
+    type: 'forca' | 'cardio' | 'alongamento' | 'refeicao' | 'sono' | 'hidratacao' | 'consulta' | 'outro';
+    muscleGroup?: 'peito' | 'costas' | 'pernas' | 'ombros' | 'bracos' | 'core' | 'fullbody';
+    exercises?: ExerciseItem[];
+    effortRating?: number;         // Avaliação de esforço de 1 a 5
+    maxLoadPr?: number;            // Carga máxima batida no dia
+    notes?: string;
+  }
+- CardioDetails: {
+    modality: 'corrida' | 'caminhada' | 'ciclismo' | 'natacao' | 'eliptico' | 'outro';
+    durationMinutes: number;
+    distanceKm?: number;
+    intensity: 'leve' | 'moderada' | 'intensa';
+    paceOrHeartRate?: string;
+  }
+
+3.4. FASE 3B — CONTRATOS DA GRADE CURRICULAR E REPETIÇÃO ESPAÇADA:
+- TopicStatus: 'nao_iniciado' | 'estudando' | 'revisando' | 'dominado'
+- Topic: {
+    id: string;
+    name: string;
+    status: TopicStatus;
+    sources: string[];             // Livro, PDF, Videoaula, etc.
+    questionsDone: number;         // Total de questões resolvidas
+    questionsCorrect: number;      // Total de acertos
+    lastReviewedAt?: string;       // Data da última revisão
+    nextReviewAt?: string;         // Próxima revisão agendada
+    revisionStage?: number;        // Etapa (1: 1 dia, 2: 7 dias, 3: 30 dias)
+    notes?: string;
+  }
+- Module: {
+    id: string;
+    name: string;
+    topics: Topic[];
+  }
+- SubjectStructure: {
+    id: string;
+    categoryId: string;
+    modules: Module[];
+  }
+
+================================================================================
+4. REPOSITÓRIO, PERSISTÊNCIA E MIGRAÇÕES (REPOSITORY.TS)
+================================================================================
+O repositório é o núcleo de dados do FocoSemanal, implementando:
+1. Versionamento de Esquema (CURRENT_SCHEMA_VERSION = 3):
+   Ao inicializar, o repositório verifica a versão gravada no localStorage.
+2. Migrações Transparentes:
+   - Migração para a categoria unificada "Estudo": converte automaticamente tarefas,
+     módulos e referências antigas de 'cat-matematica' e 'cat-fisica' para 'cat-estudo'
+     sem que o usuário perca nenhum dado ou histórico.
+3. Eventos e Reatividade:
+   Dispara `window.dispatchEvent(new Event('focosemanal_storage_update'))` para que
+   qualquer aba ou componente atualize sua tela instantaneamente sem recarregar a página.
+4. Cálculo Dinâmico de Gamificação:
+   - Tarefas concluídas calculam XP base somado a bônus por minutos reais investidos
+     e multiplicado pelo modo de estudo ativo.
+   - Cálculo de Ofensiva (Streak): verifica a sequência ininterrupta de dias com metas batidas.
+5. Backup Completo:
+   - Exportação de um arquivo `.json` contendo tarefas, categorias, estruturas, métricas
+     e configurações.
+   - Importação segura com validação de esquema e substituição atômica no banco de dados local.
+
+================================================================================
+5. MOTOR DE ÁUDIO SINTETIZADO (AUDIO.TS)
+================================================================================
+Para evitar o carregamento de arquivos MP3/WAV pesados e garantir que o áudio funcione
+instantaneamente mesmo em redes lentas ou offline, o sistema possui um sintetizador Web Audio:
+- Instância única de `AudioContext` do navegador.
+- Métodos implementados:
+  * `playTimerStart()`: dois tons ascendentes suaves anunciando o início do foco.
+  * `playTimerPause()`: tom descendente rápido indicando a pausa da sessão.
+  * `playTaskComplete()`: acorde harmônico brilhante ao concluir uma tarefa.
+  * `playLevelUp()`: arpejo festivo tetrafônico disparado ao subir de nível.
+  * `playBeep()`: feedback sonoro curto de clique para atalhos do teclado.
+- Chave de mute respeita globalmente o parâmetro `soundEnabled` de UserSettings.
+
+================================================================================
+6. MOTOR DE PROCESSAMENTO DE LINGUAGEM NATURAL (NLPPARSER.TS)
+================================================================================
+Permite que o usuário digite comandos rápidos de texto e crie tarefas completas em segundos.
+Exemplo de digitação: "Estudar cinética química amanhã às 14h por 60min !alta #vestibular"
+
+Comportamento do Analisador (Parser):
+- Detecção de Data:
+  * "hoje", "amanhã", "depois de amanhã"
+  * Dias da semana: "segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"
+- Detecção de Horário:
+  * Expressões como "às 14h", "15:30", "9h", "18:45"
+- Detecção de Duração:
+  * "30min", "45m", "1h", "1h30", "90min" -> converte automaticamente para número de minutos.
+- Detecção de Prioridade:
+  * "!urgente", "!alta", "!media", "!baixa"
+- Detecção Automática de Categoria:
+  * Palavras de estudo ("matemática", "física", "química", "leitura", "revisão") vinculam à categoria 'cat-estudo'.
+  * Palavras de treino ("treino", "academia", "supino", "corrida", "perna") vinculam à 'cat-treino'.
+  * Palavras de trabalho ("reunião", "relatório", "projeto", "email") vinculam à 'cat-trabalho'.
+
+================================================================================
+7. COMPONENTES DE INTERFACE E FLUXOS DE USUÁRIO
+================================================================================
+
+7.1. BARRA SUPERIOR (HEADER.TSX):
+- Identidade visual com o título e indicador de Modo de Estudo.
+- Indicador Gamificado: exibe o Nível atual, barra de progresso para o próximo nível
+  e chama de fogo com a quantidade de dias da ofensiva (Streak).
+- Mini Timer Ativo Flutuante: se o usuário inicia um cronômetro ou Pomodoro em uma
+  tarefa, uma barra compacta com dígitos tabulares aparece no topo com botões de play/pause
+  e atalho para abrir o modo tela cheia.
+- Botão "Grade Curricular / Conteúdos": abre a gestão de tópicos das matérias.
+- Alternador de Tema: troca instantânea entre Claro e Escuro com transição suave.
+- Botão Ajuda (?): abre o modal de atalhos rápidos.
+- Botão Ajustes: abre o painel geral de preferências.
+
+7.2. BARRA LATERAL E NAVEGAÇÃO (SIDEBAR.TSX):
+- Navegação entre as visualizações principais:
+  * "Hoje": painel diário concentrado com dashboard e linha do tempo de 07h às 22h.
+  * "Tarefas" (Estilo Asana): central de todas as tarefas com filtros e visualizações.
+  * "Semana": agenda em grade com visão de 7 dias e arrastar e soltar.
+  * "Jornada": métricas analíticas e estatísticas de foco por categoria.
+  * "Conquistas": badges e histórico de evolução de XP.
+
+7.3. CARTÃO DE BOAS-VINDAS E BARRA AGORA/PRÓXIMO (WELCOMECARD & NOWNEXTBAR):
+- Mensagem dinâmica de acordo com a hora do dia e nome do usuário.
+- Círculo de progresso com porcentagem da meta de minutos atingida hoje.
+- Botão "O que fazer agora?": algoritmo de recomendação que analisa prioridades,
+  horários vagos e tarefas atrasadas para sugerir a próxima melhor ação.
+- NowNextBar: exibe a tarefa que está em andamento agora e qual é o próximo compromisso agendado.
+
+7.4. CAIXA DE ENTRADA ESTILO ASANA (TASKSINBOXVIEW.TSX):
+- Inspirada na experiência de gerenciamento de tarefas profissional:
+- Três Abas de Visualização no topo:
+  * [Lista]: visualização em linhas densas e organizadas.
+  * [Quadro (Kanban)]: colunas 'A Fazer', 'Em Andamento' e 'Concluídas' com drag & drop.
+  * [Calendário]: exibição temporal das tarefas distribuídas por dias.
+- Seções Recolhíveis na Visão Lista:
+  * 'Hoje', 'Amanhã', 'Esta semana', 'Mais tarde' e 'Concluídas'.
+  * Cada seção possui contador de tarefas e botão "+ Adicionar tarefa" no rodapé.
+- Barra de Ferramentas de Alta Precisão:
+  * Agrupamento dinâmico: Agrupar por Data, por Matéria, por Prioridade ou Nenhum.
+  * Ordenação: por Data de Entrega, Prioridade ou Nome.
+  * Filtros em Chips: botões rápidos para filtrar por Matéria/Categoria, apenas tarefas pendentes, etc.
+  * Busca Instantânea: pesquisa em tempo real por título, descrição ou tags.
+  * Ações em Massa (Batch Actions): seleção múltipla de tarefas com barra flutuante inferior
+    para mover datas em lote, trocar categoria ou concluir tarefas de uma vez.
+- Edição Inline: clique direto no título ou metadados da linha para editar sem sair da lista.
+
+7.5. PAINEL LATERAL DE DETALHES (TASKDETAILDRAWER.TSX):
+- Ao clicar em qualquer tarefa, uma gaveta lateral suave abre à direita (tela cheia no mobile).
+- Cabeçalho: botão de concluir tarefa circular grande, botão de iniciar timer/pomodoro e botão de excluir.
+- Título editável em fonte grande (`text-xl font-bold`).
+- Campos Rápidos Padronizados:
+  * Seletor de Categoria com ícone colorido isolado.
+  * Seletor de Data e Horário com suporte a números tabulares.
+  * Seletor de Prioridade com indicador de intensidade.
+  * Estimativa de Tempo em minutos.
+- Seção Condicional FASE 3A (Treino e Saúde):
+  * Se a tarefa for da categoria 'cat-treino', renderiza o editor de musculação, grupos musculares,
+    exercícios, séries, repetições, carga (kg) e checklist de séries concluídas.
+- Seção Condicional FASE 3B (Grade Curricular e Matérias):
+  * Se a tarefa for de estudo, permite vincular diretamente a um Módulo e Tópico da matéria.
+- Bloco de Subtarefas com barra de progresso visual (% concluído).
+- Descrição com formatação de texto e notas.
+- Tags gerenciáveis e Anexos/Links externos.
+- Histórico de Atividade da Tarefa: trilha de auditoria registrando data e hora de criação,
+  edições e tempo focado acumulado.
+
+7.6. GRADE CURRICULAR E CONTEÚDOS DAS MATÉRIAS (SUBJECTSCURRICULUMMODAL.TSX):
+- Modal expansivo dedicado ao controle total dos conteúdos de estudo.
+- Barra Superior de Progresso:
+  * Porcentagem de tópicos dominados da disciplina com barra de progresso azul.
+  * Indicadores de contagem: Tópicos Dominados, Em Revisão, Estudando e Não Iniciados.
+- Filtros Rápidos por Disciplina:
+  * Permite alternar rapidamente entre matérias ou exibir todos os módulos unificados.
+- Árvore Hierárquica: Matéria -> Módulo -> Tópicos:
+  * Adição de novos módulos e tópicos.
+  * Cada tópico possui:
+    - Seletor de Status (Não iniciado, Estudando, Revisando, Dominado).
+    - Contador de Questões Resolvidas e Taxa de Acertos (%).
+    - Tags de Fontes de Estudo (Livro, Videoaula, PDF, etc.).
+    - Botão "Criar Tarefa": cria instantaneamente uma tarefa de estudo para aquele tópico
+      com estimativa de tempo e subtarefas sugeridas (Teoria, Questões, Resumo).
+- Importação Inteligente de Ementas por Texto:
+  * O estudante pode colar o texto do edital ou sumário do livro; o sistema gera os módulos
+    e tópicos estruturados automaticamente.
+
+7.7. VISÃO SEMANAL E CALENDÁRIO (WEEKVIEW.TSX):
+- Grade com 7 colunas (Segunda a Domingo).
+- Arrastar e soltar (Drag and Drop) para reorganizar dias e prioridades.
+- Totalizador de tempo estimado por dia no cabeçalho de cada coluna.
+- Exportação de Calendário: botão para baixar o arquivo `.ics` compatível com Google Calendar
+  e Apple Calendar.
+
+7.8. CRONÔMETRO IMERSIVO E POMODORO (POMODOROMODAL.TSX & FLOATINGMINITIMER.TSX):
+- Modos: Pomodoro Tradicional (25min/5min) e Foco Livre (Cronômetro crescente).
+- Controles de reprodução com atalho na barra de espaço.
+- Modo Tela Cheia Imersivo: escurece a interface e mantém apenas o relógio em fonte gigante
+  com os dígitos tabulares, a tarefa ativa e frases motivacionais.
+- Ao término do ciclo, registra os minutos reais na tarefa, soma XP e toca áudio harmônico.
+
+7.9. MODAIS COMPLEMENTARES:
+- SettingsModal: troca de temas, configurações de som, tempo de pomodoro, metas diárias e backup.
+- WhatToDoModal: motor de recomendação inteligente para momentos de indecisão.
+- PlanWeekModal: assistente passo a passo para planejar a semana que se inicia.
+- TemplatesModal: modelos pré-configurados de rotinas de estudo e treinos prontos para aplicar.
+- ShortcutsHelpModal: guia visual de todos os atalhos de teclado suportados.
+- OnboardingModal: tela de boas-vindas para primeiro acesso com configuração de perfil e matérias.
+
+================================================================================
+8. FASE 3A EM DETALHES: MÓDULO DE TREINO, SAÚDE E HÁBITOS
+================================================================================
+O módulo de saúde e exercícios transforma o FocoSemanal em um diário de treino completo:
+- Tipos de Treino: Força (Musculação), Cardio, Mobilidade, Refeição, Sono, Hidratação e Consulta.
+- Treino de Força:
+  * Seleção de Grupo Muscular: Peito, Costas, Pernas, Ombros, Braços, Core ou Full Body.
+  * Exercícios Dinâmicos: Nome do exercício, séries, repetições, carga (kg) e tempo de descanso.
+  * Séries Interativas: Cada série possui uma caixinha de verificação individual que o usuário
+    marca durante o treino na academia.
+  * Histórico de Carga Anterior: Exibe lembrete automático do peso levantado no treino passado
+    para guiar a sobrecarga progressiva.
+  * Duplicação e Reordenação rápida de exercícios.
+- Cardio:
+  * Modalidade (Corrida, Ciclismo, Natação, etc.), distância percorrida em km e ritmo/FC.
+- Gamificação: Concluir treinos pontua na meta diária de XP respeitando o perfil ativo.
+
+================================================================================
+9. FASE 3B EM DETALHES: MÓDULO DE MATÉRIAS, ÁRVORE DE TÓPICOS E REPETIÇÃO ESPAÇADA
+================================================================================
+Projetado para estudantes de vestibulares de ponta e concursos concorridos:
+- Árvore de 3 Níveis: Matéria -> Módulo / Assunto -> Tópico Individual.
+- Ciclo de Vida do Tópico:
+  1. 'nao_iniciado': conteúdo pendente no cronograma.
+  2. 'estudando': em fase de absorção de teoria e primeiras questões.
+  3. 'revisando': em ciclo ativo de repetição espaçada.
+  4. 'dominado': índice de acerto alto e fixação comprovada.
+- Repetição Espaçada Integrada (Spaced Repetition):
+  * Estágio 1: Revisão agendada para 24 horas (1 dia).
+  * Estágio 2: Revisão agendada para 7 dias.
+  * Estágio 3: Revisão agendada para 30 dias.
+- Métricas de Fixação: Total de questões resolvidas versus acertos com cálculo de porcentagem.
+
+================================================================================
+10. SISTEMA DE GAMIFICAÇÃO, XP, NÍVEIS E MODOS DE ESTUDO
+================================================================================
+O sistema de recompensas foi calibrado para evitar vício superficial e gerar disciplina real:
+- Modos de Estudo Disponíveis:
+  * Padrão: equilíbrio entre tarefas e tempo (Meta: 300 XP/dia).
+  * Concurso: foco em alta carga horária e resolução de questões (Meta: 500 XP/dia).
+  * Vestibular: ênfase em conteúdo denso e matérias exatas (Meta: 450 XP/dia).
+  * Faculdade: ritmo voltado a entregas de projetos e leituras (Meta: 350 XP/dia).
+  * Trabalho: priorização de entregas rápidas e reuniões (Meta: 300 XP/dia).
+  * Hábitos: foco em micro-consistência diária (Meta: 200 XP/dia).
+- Fórmula de XP:
+  XP Ganho = (TaskBaseXP + (MinutosReais * MinuteBaseXP)) * MultiplicadorStreak
+- Sistema de Níveis:
+  * Nível 1: Aspirante (0 a 499 XP)
+  * Nível 2: Focado (500 a 1199 XP)
+  * Nível 3: Disciplinado (1200 a 2399 XP)
+  * Nível 4: Mestre do Tempo (2400 a 4499 XP)
+  * Nível 5: Lenda da Consistência (4500+ XP)
+- Efeito Confetti e Áudio: Disparado ao bater a meta diária ou alcançar novo nível.
+
+================================================================================
+11. ATALHOS DE TECLADO E ACESSIBILIDADE UNIVERSAL
+================================================================================
+O sistema pode ser operado quase sem encostar no mouse:
+- N: Abrir caixa de criação rápida de nova tarefa.
+- E: Abrir gaveta de edição da tarefa em destaque.
+- Espaço: Iniciar ou pausar o cronômetro da tarefa ativa.
+- Cmd + K / Ctrl + K: Abrir paleta de comandos globais para busca e ações instantâneas.
+- Escape: Fechar gavetas, painéis laterais e qualquer modal aberto.
+- ?: Abrir modal com a lista completa de atalhos.
+- Tab / Shift + Tab: Navegação por foco acessível com anéis de realce visíveis.
+
+================================================================================
+12. RESUMO DE ARQUIVOS DO PROJETO
+================================================================================
+- /index.html: Ponto de entrada HTML, fontes do Google e viewport mobile.
+- /src/index.css: Design System, variáveis de tema Claro/Escuro e resets Tailwind.
+- /src/types.ts: Todas as interfaces e contratos TypeScript da aplicação.
+- /src/services/repository.ts: Repositório de dados, cálculos, migrações e persistência.
+- /src/services/audio.ts: Sintetizador Web Audio API para efeitos sonoros de foco.
+- /src/utils/nlpParser.ts: Processamento de linguagem natural para entrada de tarefas.
+- /src/components/Header.tsx: Barra superior, mini timer, perfil e seletor de tema.
+- /src/components/Sidebar.tsx: Navegação lateral responsiva.
+- /src/components/TasksInboxView.tsx: Caixa de entrada estilo Asana (Lista, Kanban, Calendário).
+- /src/components/TaskDetailDrawer.tsx: Painel lateral de detalhes (Treino 3A e Matérias 3B).
+- /src/components/SubjectsCurriculumModal.tsx: Modal completo de Grade Curricular e Tópicos.
+- /src/components/WeekView.tsx: Planejador semanal de 7 dias com arrastar e soltar.
+- /src/components/PomodoroModal.tsx: Sessão de foco com Pomodoro e tela cheia imersiva.
+- /src/components/SettingsModal.tsx: Configurações, matérias ativas, sons e backup de dados.
+- /src/components/WhatToDoModal.tsx: Assistente de recomendação inteligente do próximo passo.
+- /src/App.tsx: Ponto de montagem principal, gerenciador de rotas e orquestrador de estado.
+
+================================================================================
+FIM DA DOCUMENTAÇÃO DO SISTEMA FOCOSEMANAL
+================================================================================
