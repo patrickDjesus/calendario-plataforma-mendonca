@@ -45,6 +45,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState(categories[0]?.id || 'cat-estudo');
   const [priority, setPriority] = useState<Priority>('media');
+  const [hoveredPriority, setHoveredPriority] = useState<Priority | null>(null);
   const [date, setDate] = useState(initialDate || getTodayISO());
   const [time, setTime] = useState('');
   const [estimatedMinutes, setEstimatedMinutes] = useState<number>(45);
@@ -373,18 +374,24 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               <div className="p-1.5 bg-[var(--surface-secondary)] border border-[var(--borda)] rounded-xl grid grid-cols-4 gap-1.5">
                 {prioritiesList.map((p) => {
                   const isSelected = priority === p.id;
+                  const isHovered = hoveredPriority === p.id;
+                  const siblingsDimmed = hoveredPriority !== null && !isHovered;
                   return (
                     <button
                       type="button"
                       key={p.id}
                       onClick={() => setPriority(p.id)}
+                      onMouseEnter={() => setHoveredPriority(p.id)}
+                      onMouseLeave={() => setHoveredPriority(null)}
                       title={p.label}
                       aria-pressed={isSelected}
-                      className={`relative h-16 sm:h-20 rounded-lg border-2 overflow-hidden transition-all cursor-pointer group ${
-                        isSelected
-                          ? `${p.activeStyle} shadow-md`
-                          : 'border-transparent opacity-75 hover:opacity-100 hover:border-[var(--borda-hover)]'
-                      }`}
+                      className={`relative h-16 sm:h-20 rounded-lg border-2 overflow-hidden cursor-pointer transition-all duration-200 ${
+                        isHovered
+                          ? 'border-[var(--primary)] z-10 scale-x-110 shadow-md'
+                          : isSelected
+                            ? `${p.activeStyle} shadow-sm`
+                            : 'border-transparent hover:border-[var(--borda-hover)]'
+                      } ${siblingsDimmed ? 'opacity-40 blur-[1.5px]' : 'opacity-100 blur-0'}`}
                     >
                       <img
                         src={p.img}
@@ -392,7 +399,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                         loading="lazy"
                         decoding="async"
                         className={`w-full h-full object-cover transition-all duration-200 ${
-                          isSelected ? '' : 'grayscale-[0.25] group-hover:grayscale-0'
+                          isSelected && !isHovered ? '' : !isHovered && !isSelected ? 'grayscale-[0.2]' : 'grayscale-0'
                         }`}
                       />
                       {/* Check de seleção */}
@@ -401,11 +408,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                           <Check className="w-3 h-3 stroke-[3]" />
                         </span>
                       )}
-                      <span className={`pointer-events-none absolute inset-x-0 bottom-0 text-center text-[9px] sm:text-[10px] font-bold uppercase tracking-wide py-0.5 backdrop-blur-sm ${
-                        isSelected ? 'bg-black/45 text-white' : 'bg-black/30 text-white/90'
-                      }`}>
-                        {p.label}
-                      </span>
                     </button>
                   );
                 })}
