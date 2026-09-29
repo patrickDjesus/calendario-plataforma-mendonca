@@ -385,13 +385,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       onMouseLeave={() => setHoveredPriority(null)}
                       title={p.label}
                       aria-pressed={isSelected}
-                      className={`relative h-16 sm:h-20 rounded-lg border-2 overflow-hidden cursor-pointer transition-all duration-200 ${
+                      className={`relative aspect-[245/200] rounded-lg border-2 overflow-hidden cursor-pointer transition-all duration-200 ${
                         isHovered
                           ? 'border-[var(--primary)] z-10 scale-x-110 shadow-md'
                           : isSelected
                             ? `${p.activeStyle} shadow-sm`
                             : 'border-transparent hover:border-[var(--borda-hover)]'
-                      } ${siblingsDimmed ? 'opacity-40 blur-[1.5px]' : 'opacity-100 blur-0'}`}
+                      } ${
+                        siblingsDimmed
+                          ? 'opacity-60 scale-x-[0.95]'
+                          : 'opacity-100 scale-x-100'
+                      }`}
                     >
                       <img
                         src={p.img}
@@ -399,7 +403,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                         loading="lazy"
                         decoding="async"
                         className={`w-full h-full object-cover transition-all duration-200 ${
-                          isSelected && !isHovered ? '' : !isHovered && !isSelected ? 'grayscale-[0.2]' : 'grayscale-0'
+                          siblingsDimmed
+                            ? 'grayscale-[0.3]'
+                            : isHovered || isSelected
+                              ? 'grayscale-0'
+                              : 'grayscale-[0.15]'
                         }`}
                       />
                       {/* Check de seleção */}
