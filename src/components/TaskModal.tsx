@@ -385,7 +385,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       onMouseLeave={() => setHoveredPriority(null)}
                       title={p.label}
                       aria-pressed={isSelected}
-                      className={`relative aspect-[245/200] rounded-lg border-2 overflow-hidden cursor-pointer transition-all duration-200 ${
+                      className={`relative h-20 sm:h-40 rounded-lg border-2 overflow-hidden cursor-pointer transition-all duration-200 ${
                         isHovered
                           ? 'border-[var(--primary)] z-10 scale-x-110 shadow-md'
                           : isSelected
@@ -402,7 +402,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                         alt={`Prioridade ${p.label}`}
                         loading="lazy"
                         decoding="async"
-                        className={`w-full h-full object-cover transition-all duration-200 ${
+                        className={`w-full h-full object-cover object-bottom transition-all duration-200 ${
                           siblingsDimmed
                             ? 'grayscale-[0.3]'
                             : isHovered || isSelected
