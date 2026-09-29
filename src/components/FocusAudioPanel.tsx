@@ -2,22 +2,19 @@
  * Painel de som do modo foco.
  *
  * Duas fontes independentes, de proposito:
- *  - AMBIENTE: som sintetizado na hora (chuva, cafe, ruido). Nao usa arquivo,
- *    nao tem custo de download e nunca para.
- *  - MUSICA: arquivo do usuario, por escolha ou URL. Aqui nao entra nada
- *    empacotado no app — a licenca do som e de quem traz o arquivo.
- *
- * Os dois tem volume proprio. Um ambiente de chuva nao deve ser silenciado
- * junto com a trilha, nem o contrario.
+ *  - AMBIENTE: som sintetizado na hora (chuva, cafe, ruido). Usa um AudioContext
+ *    local, nunca passa pelo gate de Aviso Sonoro e para quando o painel desmonta.
+ *  - MUSICA: video do YouTube escolhido pelo proprio usuario. Nada e empacotado
+ *    no app — a licenca do conteudo e de quem o fornece. O player fica escondido
+ *    (iframe 1x1), mas mantem volume e play/pause controlaveis.
  *
  * O audio para quando o painel desmonta: sair do modo foco encerra o som, senao
  * a trilha continuaria tocando na tela principal.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Volume2, VolumeX, Music4, CloudRain, Coffee, Waves, Radio, Link2, Upload, Play, Pause } from 'lucide-react';
+import { Volume2, VolumeX, Music4, CloudRain, Coffee, Waves, Radio, Youtube, Play, Pause, Loader2 } from 'lucide-react';
 import { audioSynthesizer } from '../services/audioSynthesizer';
-import { musicPlayer, AUDIO_ACCEPT, isProbablyAudio, type MusicState } from '../services/musicPlayer';
 
 type AmbientType = 'none' | 'chuva' | 'cafe' | 'ruido_marrom' | 'ruido_branco' | 'binaural';
 
@@ -36,10 +33,11 @@ interface Prefs {
   ambient: AmbientType;
   ambientVolume: number;
   musicVolume: number;
+  ytUrl: string;
 }
 
 const readPrefs = (): Prefs => {
-  const fallback: Prefs = { ambient: 'none', ambientVolume: 0.5, musicVolume: 0.6 };
+  const fallback: Prefs = { ambient: 'none', ambientVolume: 0.5, musicVolume: 0.6, ytUrl: '' };
   if (typeof localStorage === 'undefined') return fallback;
   try {
     const raw = localStorage.getItem(PREF_KEY);
@@ -50,72 +48,165 @@ const readPrefs = (): Prefs => {
   }
 };
 
+/** Extrai o id do video de qualquer formato comum de URL do YouTube. */
+const parseYouTubeId = (url: string): string | null => {
+  const u = url.trim();
+  const match = u.match(
+    /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/,
+  );
+  return match ? match[1] : null;
+};
+
+declare global {
+  interface Window {
+    YT?: {
+      Player: new (id: string, opts: Record<string, unknown>) => {
+        destroy: () => void;
+        playVideo: () => void;
+        pauseVideo: () => void;
+        setVolume: (v: number) => void;
+      };
+    };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+let ytApiPromise: Promise<void> | null = null;
+/** Carrega a API do YouTube uma vez so, e devolve quando ela estiver pronta. */
+const ensureYouTubeApi = (): Promise<void> => {
+  if (window.YT?.Player) return Promise.resolve();
+  if (ytApiPromise) return ytApiPromise;
+  ytApiPromise = new Promise((resolve) => {
+    const previous = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      previous?.();
+      resolve();
+    };
+    const script = document.createElement('script');
+    script.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(script);
+  });
+  return ytApiPromise;
+};
+
+interface YTPlayerHandle {
+  destroy: () => void;
+  playVideo: () => void;
+  pauseVideo: () => void;
+  setVolume: (v: number) => void;
+}
+
 export const FocusAudioPanel: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [prefs, setPrefs] = useState<Prefs>(readPrefs);
-  const [musicState, setMusicState] = useState<MusicState>(musicPlayer.getState());
-  const [trackLabel, setTrackLabel] = useState<string | null>(musicPlayer.getTrack()?.label ?? null);
   const [url, setUrl] = useState('');
+  const [videoId, setVideoId] = useState<string | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const playerRef = useRef<YTPlayerHandle | null>(null);
+  const ytHostId = useRef(`yt-host-${Math.random().toString(36).slice(2)}`);
 
-  // A escolha do ambiente e volumes fica para a proxima sessao de foco.
+  // A escolha do ambiente e volume fica para a proxima sessao de foco.
   useEffect(() => {
     try { localStorage.setItem(PREF_KEY, JSON.stringify(prefs)); } catch {}
   }, [prefs]);
 
-  // Ambiente comeca junto com o painel: o clique em abrir ja e o gesto exigido
-  // pelo navegador para tocar audio.
+  // Ambiente: inicia/para de acordo com a escolha. Precisa rodar a cada troca,
+  // nao so no mount — antes, clicar em "Chuva" nao iniciava nada.
   useEffect(() => {
     audioSynthesizer.setAmbientSound(prefs.ambient, prefs.ambientVolume);
     return () => audioSynthesizer.stopAmbient();
+  }, [prefs.ambient, prefs.ambientVolume]);
+
+  // Arranca sozinho quando o painel monta? Sim, se ja havia URL salva: o abrir
+  // do modo foco ja e o gesto do navegador que libera autoplay de video.
+  useEffect(() => {
+    if (prefs.ytUrl) {
+      const id = parseYouTubeId(prefs.ytUrl);
+      if (id) setVideoId(id);
+    }
+    return () => {
+      playerRef.current?.destroy();
+      playerRef.current = null;
+    };
   }, []);
 
+  // Player do YouTube para o video escolhido. Trocar de video destroi e recria.
   useEffect(() => {
-    audioSynthesizer.setAmbientVolume(prefs.ambientVolume);
-  }, [prefs.ambientVolume]);
+    if (!videoId) return;
+    let disposed = false;
+    playerRef.current?.destroy();
+    playerRef.current = null;
+    setLoading(true);
+    setErro(null);
 
+    ensureYouTubeApi()
+      .then(() => {
+        if (disposed || !window.YT?.Player) return;
+        const player = new window.YT.Player(ytHostId.current, {
+          videoId,
+          width: '100%',
+          height: '100%',
+          playerVars: { autoplay: 1, loop: 1, playlist: videoId, controls: 0, rel: 0, playsinline: 1 },
+          events: {
+            onReady: () => {
+              if (disposed) return;
+              playerRef.current = player;
+              player.setVolume(Math.round(prefs.musicVolume * 100));
+              setLoading(false);
+              setPlaying(true);
+            },
+          },
+        });
+      })
+      .catch(() => {
+        if (disposed) return;
+        setLoading(false);
+        setErro('Não consegui carregar o player do YouTube. Confira a conexão.');
+      });
+
+    return () => {
+      disposed = true;
+      playerRef.current?.destroy();
+      playerRef.current = null;
+    };
+  }, [videoId]);
+
+  // Volume da trilha vai para o player a cada mudanca.
   useEffect(() => {
-    musicPlayer.setVolume(prefs.musicVolume);
+    playerRef.current?.setVolume(Math.round(prefs.musicVolume * 100));
   }, [prefs.musicVolume]);
 
-  useEffect(() => {
-    musicPlayer.onStateChange = (s) => {
-      setMusicState(s);
-      if (s === 'blocked') setErro('O navegador bloqueou o autoplay. Clique em tocar de novo.');
-      if (s === 'error') setErro('Nao consegui tocar esse arquivo. Confira se a URL aponta direto para um audio.');
-      if (s === 'playing' || s === 'paused') setErro(null);
-    };
-    return () => { musicPlayer.onStateChange = undefined; };
-  }, []);
-
-  // Sair do modo foco encerra a trilha tambem.
-  useEffect(() => () => {
-    musicPlayer.stop();
-  }, []);
-
-  const escolherArquivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!isProbablyAudio(file)) {
-      setErro('Esse arquivo nao parece ser audio.');
+  const tocarYouTube = async () => {
+    const id = parseYouTubeId(url);
+    if (!id) {
+      setErro('Essa URL não parece um link do YouTube.');
       return;
     }
-    await musicPlayer.playFile(file);
-    setTrackLabel(musicPlayer.getTrack()?.label ?? null);
-    e.target.value = '';
+    setUrl('');
+    setPrefs(p => ({ ...p, ytUrl: url.trim() }));
+    setVideoId(id);
   };
 
-  const tocarUrl = async () => {
-    if (!url.trim()) return;
-    await musicPlayer.playUrl(url);
-    setTrackLabel(musicPlayer.getTrack()?.label ?? null);
+  const alternar = () => {
+    const player = playerRef.current;
+    if (!player) return;
+    if (playing) {
+      player.pauseVideo();
+      setPlaying(false);
+    } else {
+      player.playVideo();
+      setPlaying(true);
+    }
   };
 
-  const pararTudo = () => {
-    musicPlayer.stop();
-    setTrackLabel(null);
-    setErro(null);
+  const tirar = () => {
+    playerRef.current?.destroy();
+    playerRef.current = null;
+    setVideoId(null);
+    setPlaying(false);
+    setPrefs(p => ({ ...p, ytUrl: '' }));
   };
 
   const ambienteAtivo = audioSynthesizer.getActiveAmbient();
@@ -127,7 +218,7 @@ export const FocusAudioPanel: React.FC = () => {
         onClick={() => setOpen(o => !o)}
         title="Som ambiente e trilha"
         className={`h-9 px-3 rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-          ambienteAtivo !== 'none' || musicState === 'playing'
+          ambienteAtivo !== 'none' || playing
             ? 'bg-blue-500 text-white shadow-xs'
             : 'bg-white hover:bg-black/5 text-slate-600 border border-black/10'
         }`}
@@ -135,6 +226,14 @@ export const FocusAudioPanel: React.FC = () => {
         <Volume2 className="w-3.5 h-3.5" />
         <span>Som</span>
       </button>
+
+      {/* Host escondido do player do YouTube: sempre no DOM para o player
+          conseguir montar mesmo com o menu fechado. */}
+      {videoId && (
+        <div aria-hidden className="fixed top-0 left-0 w-px h-px overflow-hidden opacity-0 pointer-events-none">
+          <div id={ytHostId.current} />
+        </div>
+      )}
 
       {open && (
         <div className="absolute right-0 top-11 z-30 w-72 rounded-2xl bg-white border border-black/10 shadow-xl p-4 space-y-4 text-left">
@@ -173,62 +272,51 @@ export const FocusAudioPanel: React.FC = () => {
             </label>
           </div>
 
-          {/* Musica */}
+          {/* Musica (YouTube) */}
           <div className="pt-3 border-t border-black/10">
             <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
-              Sua trilha
+              Sua trilha (YouTube)
             </div>
 
-            <input
-              ref={fileRef}
-              type="file"
-              accept={AUDIO_ACCEPT}
-              onChange={escolherArquivo}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="w-full py-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              Escolher arquivo no dispositivo
-            </button>
-
-            <div className="flex gap-1.5 mt-2">
+            <div className="flex gap-1.5">
               <input
                 value={url}
                 onChange={e => setUrl(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') void tocarUrl(); }}
-                placeholder="ou cole a URL do audio"
+                onKeyDown={e => { if (e.key === 'Enter') void tocarYouTube(); }}
+                placeholder="cole a URL do vídeo (youtu.be/...)"
                 className="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg border border-black/10 bg-slate-50 text-[11px] text-slate-700 focus:outline-none focus:border-blue-400"
               />
               <button
                 type="button"
-                onClick={tocarUrl}
-                title="Tocar a URL"
+                onClick={() => void tocarYouTube()}
+                title="Tocar no YouTube"
                 className="px-2.5 rounded-lg bg-slate-50 border border-black/10 text-slate-600 hover:bg-slate-100 cursor-pointer"
               >
-                <Link2 className="w-3.5 h-3.5" />
+                <Youtube className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            {trackLabel && (
+            {videoId && (
               <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => void musicPlayer.toggle()}
-                  className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center cursor-pointer hover:opacity-90"
-                  title={musicState === 'playing' ? 'Pausar' : 'Tocar'}
+                  onClick={alternar}
+                  disabled={loading || !playerRef.current}
+                  className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center cursor-pointer hover:opacity-90 disabled:opacity-40 disabled:cursor-default"
+                  title={loading ? 'Carregando...' : playing ? 'Pausar' : 'Tocar'}
                 >
-                  {musicState === 'playing'
-                    ? <Pause className="w-3.5 h-3.5 fill-current" />
-                    : <Play className="w-3.5 h-3.5 fill-current" />}
+                  {loading
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : playing
+                      ? <Pause className="w-3.5 h-3.5 fill-current" />
+                      : <Play className="w-3.5 h-3.5 fill-current" />}
                 </button>
-                <span className="text-[11px] font-semibold text-slate-600 truncate flex-1">{trackLabel}</span>
+                <span className="text-[11px] font-semibold text-slate-600 truncate flex-1">
+                  YouTube · {videoId}
+                </span>
                 <button
                   type="button"
-                  onClick={pararTudo}
+                  onClick={tirar}
                   className="text-[10px] font-bold text-slate-400 hover:text-rose-500 cursor-pointer"
                 >
                   Tirar
@@ -256,8 +344,8 @@ export const FocusAudioPanel: React.FC = () => {
           )}
 
           <p className="text-[10px] text-slate-400 leading-relaxed">
-            O app nao distribui musica. Use um arquivo seu ou uma URL que voce
-            tenha direito de ouvir.
+            O app não distribui música. Cole um vídeo do YouTube que você tenha
+            direito de ouvir enquanto estuda.
           </p>
         </div>
       )}

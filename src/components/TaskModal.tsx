@@ -13,6 +13,7 @@ import {
   Star, 
   Pin,
   ChevronDown,
+  Check,
   ChevronUp,
   CornerDownLeft
 } from 'lucide-react';
@@ -251,11 +252,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   const durationShortcuts = [15, 30, 45, 60, 90];
 
-  const prioritiesList: Array<{ id: Priority; label: string; dotColor: string; activeStyle: string }> = [
-    { id: 'baixa', label: 'Baixa', dotColor: 'bg-emerald-500', activeStyle: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30' },
-    { id: 'media', label: 'Média', dotColor: 'bg-amber-500', activeStyle: 'bg-amber-500/10 text-amber-700 border-amber-500/30' },
-    { id: 'alta', label: 'Alta', dotColor: 'bg-orange-500', activeStyle: 'bg-orange-500/10 text-orange-700 border-orange-500/30' },
-    { id: 'urgente', label: 'Urgente', dotColor: 'bg-rose-500', activeStyle: 'bg-rose-500/10 text-rose-700 border-rose-500/30' },
+  const prioritiesList: Array<{ id: Priority; label: string; img: string; activeStyle: string }> = [
+    { id: 'baixa', label: 'Baixa', img: '/gifs/baixa-prioridade.jpg', activeStyle: 'bg-emerald-500/10 border-emerald-500/30' },
+    { id: 'media', label: 'Média', img: '/gifs/media-prioridade.jpg', activeStyle: 'bg-amber-500/10 border-amber-500/30' },
+    { id: 'alta', label: 'Alta', img: '/gifs/alta-prioridade.jpg', activeStyle: 'bg-orange-500/10 border-orange-500/30' },
+    { id: 'urgente', label: 'Urgente', img: '/gifs/urgente-prioridade.jpg', activeStyle: 'bg-rose-500/10 border-rose-500/30' },
   ];
 
   const isTitleInvalid = hasAttemptedSubmit && !title.trim();
@@ -364,12 +365,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               </div>
             </div>
 
-            {/* 3. Priority (Discrete Segmented Control with 4 levels) */}
+            {/* 3. Priority (imagens em uma row que preenche a largura) */}
             <div>
               <label className="block text-xs font-semibold text-[var(--texto-suave)] mb-1.5">
                 Prioridade
               </label>
-              <div className="p-1 bg-[var(--surface-secondary)] border border-[var(--borda)] rounded-xl grid grid-cols-4 gap-1">
+              <div className="p-1.5 bg-[var(--surface-secondary)] border border-[var(--borda)] rounded-xl grid grid-cols-4 gap-1.5">
                 {prioritiesList.map((p) => {
                   const isSelected = priority === p.id;
                   return (
@@ -377,14 +378,34 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       type="button"
                       key={p.id}
                       onClick={() => setPriority(p.id)}
-                      className={`h-9 px-2 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      title={p.label}
+                      aria-pressed={isSelected}
+                      className={`relative h-16 sm:h-20 rounded-lg border-2 overflow-hidden transition-all cursor-pointer group ${
                         isSelected
-                          ? `${p.activeStyle} shadow-xs font-bold`
-                          : 'border-transparent text-[var(--texto-suave)] hover:text-[var(--texto)] hover:bg-[var(--surface)]'
+                          ? `${p.activeStyle} shadow-md`
+                          : 'border-transparent opacity-75 hover:opacity-100 hover:border-[var(--borda-hover)]'
                       }`}
                     >
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${p.dotColor}`} />
-                      <span className="truncate">{p.label}</span>
+                      <img
+                        src={p.img}
+                        alt={`Prioridade ${p.label}`}
+                        loading="lazy"
+                        decoding="async"
+                        className={`w-full h-full object-cover transition-all duration-200 ${
+                          isSelected ? '' : 'grayscale-[0.25] group-hover:grayscale-0'
+                        }`}
+                      />
+                      {/* Check de seleção */}
+                      {isSelected && (
+                        <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[var(--primary)] text-white flex items-center justify-center shadow-sm">
+                          <Check className="w-3 h-3 stroke-[3]" />
+                        </span>
+                      )}
+                      <span className={`pointer-events-none absolute inset-x-0 bottom-0 text-center text-[9px] sm:text-[10px] font-bold uppercase tracking-wide py-0.5 backdrop-blur-sm ${
+                        isSelected ? 'bg-black/45 text-white' : 'bg-black/30 text-white/90'
+                      }`}>
+                        {p.label}
+                      </span>
                     </button>
                   );
                 })}

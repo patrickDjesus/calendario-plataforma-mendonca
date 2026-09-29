@@ -124,7 +124,7 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
       />
 
       {/* Top Header: Categoria & Ferramentas */}
-      <div className="relative z-10 flex items-center justify-between gap-4 max-w-5xl mx-auto w-full flex-wrap">
+      <div className="relative z-40 flex items-center justify-between gap-4 max-w-5xl mx-auto w-full flex-wrap">
         {/* Category badge */}
         <div data-gif-host className="flex items-center gap-3">
           {category && <CategoryIcon category={category} size="sm" />}
