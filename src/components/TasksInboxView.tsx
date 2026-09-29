@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { Task, Category, Priority } from '../types';
 import { formatSecondsToDigital, formatMinutesHuman, getTodayISO, addDaysToDate, getDayOfWeekLabel } from '../utils/dateUtils';
+import { occursOn } from '../services/recurrence';
 import { CategoryIcon } from './CategoryIcon';
 import { GifIcon } from './GifIcon';
 
@@ -193,8 +194,8 @@ export const TasksInboxView: React.FC<TasksInboxViewProps> = ({
 
       // Quick status filters
       if (statusFilter === 'nodate' && task.date) return false;
-      if (statusFilter === 'today' && task.date !== todayISO) return false;
-      if (statusFilter === 'tomorrow' && task.date !== tomorrowISO) return false;
+      if (statusFilter === 'today' && !occursOn(task, todayISO)) return false;
+      if (statusFilter === 'tomorrow' && !occursOn(task, tomorrowISO)) return false;
       if (statusFilter === 'top3' && !task.isTop3) return false;
       if (statusFilter === 'completed' && !task.completed) return false;
 

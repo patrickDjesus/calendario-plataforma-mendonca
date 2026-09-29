@@ -18,6 +18,7 @@ import { Task, Category } from '../types';
 import { formatSecondsToDigital, formatMinutesHuman } from '../utils/dateUtils';
 import { repository } from '../services/repository';
 import { CategoryIcon } from './CategoryIcon';
+import { FocusAudioPanel } from './FocusAudioPanel';
 
 interface FullscreenFocusModeProps {
   isOpen: boolean;
@@ -28,6 +29,9 @@ interface FullscreenFocusModeProps {
   onToggleTimer: () => void;
   onCompleteTask: (task: Task, reflectionNote?: string, enableSpacedRepetition?: boolean) => void;
   category?: Category;
+  /** Fase do Pomodoro em curso; 0 = sem bloco configurado. */
+  phaseTargetSeconds?: number;
+  phaseLabel?: string;
 }
 
 export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
@@ -39,6 +43,8 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
   onToggleTimer,
   onCompleteTask,
   category,
+  phaseTargetSeconds = 0,
+  phaseLabel,
 }) => {
   const [reflectionNote, setReflectionNote] = useState('');
   const [obstacleNote, setObstacleNote] = useState('');
@@ -58,8 +64,16 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
 
   if (!isOpen || !activeTask) return null;
 
-  const estimatedSeconds = (activeTask.estimatedMinutes || 45) * 60;
-  const progressPercent = Math.min(100, Math.round((activeTimerElapsed / estimatedSeconds) * 100));
+  // O anel mede o BLOCO do Pomodoro quando ha fase em curso, e cai para a
+  // estimativa da tarefa quando o bloco termina e sobra tempo de trabalho.
+  const blockSeconds = phaseTargetSeconds || 0;
+  const fallbackSeconds = (activeTask.estimatedMinutes || 45) * 60;
+  const usaBloco = blockSeconds > 0 && activeTimerElapsed <= blockSeconds;
+  const alvo = usaBloco ? blockSeconds : fallbackSeconds;
+  const referencia = usaBloco ? activeTimerElapsed : Math.max(activeTimerElapsed - blockSeconds, 0);
+  const progressPercent = alvo > 0
+    ? Math.min(100, Math.round((referencia / alvo) * 100))
+    : 0;
 
   // Big SVG Ring Math
   const radius = 130;
@@ -124,8 +138,10 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
           </div>
         </div>
 
-        {/* Right Tools: Anotar Distração & Modo Prova & Fechar */}
+        {/* Right Tools: Som & Anotar Distração & Modo Prova & Fechar */}
         <div className="flex items-center gap-2">
+          <FocusAudioPanel />
+
           {/* Anotar Distração Button */}
           <button
             type="button"

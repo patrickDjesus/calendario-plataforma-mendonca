@@ -153,6 +153,12 @@ export interface Task {
   subtasks: Subtask[];
   recurringDays?: number[]; // 0 = Dom, 1 = Seg, ..., 6 = Sab
   recurringId?: string;
+  /** Dias pulados de propósito numa série: YYYY-MM-DD. Some a ocorrência, não a regra. */
+  recurrenceExceptions?: string[];
+  /** Conclusão por dia da série: { 'YYYY-MM-DD': true }. Concluir um dia não afeta outro. */
+  recurrenceCompletions?: Record<string, boolean>;
+  /** Tempo gasto por dia da série: { 'YYYY-MM-DD': segundos }. */
+  spentSecondsByDay?: Record<string, number>;
   reflectionNote?: string;
   /** Choveu no dia e a tarefa ficou inviável (só faz sentido em tarefa de saúde). */
   blockedByRain?: boolean;

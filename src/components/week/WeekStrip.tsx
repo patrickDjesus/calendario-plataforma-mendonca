@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { InfiniteDayItem } from '../../hooks/useInfiniteDays';
 import { DayColumn } from './DayColumn';
 import { Task, Category } from '../../types';
+import { tasksByDate as tasksByDateMap } from '../../services/recurrence';
 import { ArrowLeft, ArrowRight, Calendar } from 'lucide-react';
 
 interface WeekStripProps {
@@ -133,16 +134,11 @@ export const WeekStrip: React.FC<WeekStripProps> = ({
     };
   }, [draggedTaskId, containerRef]);
 
-  // Group tasks by date
-  const tasksByDate = React.useMemo(() => {
-    const map = new Map<string, Task[]>();
-    tasks.forEach(t => {
-      const list = map.get(t.date) || [];
-      list.push(t);
-      map.set(t.date, list);
-    });
-    return map;
-  }, [tasks]);
+  // Group tasks by date, materializando as ocorrencias das tarefas recorrentes
+  const tasksByDate = React.useMemo(
+    () => tasksByDateMap(tasks, days.map(d => d.dateISO)),
+    [tasks, days],
+  );
 
   return (
     <div className="relative w-full flex-1 overflow-hidden">

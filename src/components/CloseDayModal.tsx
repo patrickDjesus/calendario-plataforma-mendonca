@@ -3,6 +3,7 @@ import { Sparkles, CheckCircle2, ArrowRight, X, Clock, Calendar, CheckSquare } f
 import { GifIcon } from './GifIcon';
 import { Task, DailyMood, UserProfile } from '../types';
 import { formatSecondsToDigital, getTodayISO } from '../utils/dateUtils';
+import { tasksForDate } from '../services/recurrence';
 
 interface CloseDayModalProps {
   isOpen: boolean;
@@ -31,7 +32,7 @@ export const CloseDayModal: React.FC<CloseDayModalProps> = ({
   const [selectedPendingIds, setSelectedPendingIds] = useState<string[]>([]);
 
   const todayISO = getTodayISO();
-  const todayTasks = tasks.filter(t => t.date === todayISO && !t.deletedAt);
+  const todayTasks = tasksForDate(tasks, todayISO).filter(t => !t.deletedAt);
   const completedTasks = todayTasks.filter(t => t.completed);
   const pendingTasks = todayTasks.filter(t => !t.completed);
 

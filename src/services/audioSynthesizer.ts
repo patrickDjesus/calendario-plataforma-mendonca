@@ -9,6 +9,27 @@ class AudioSynthesizer {
   private ambientSource: AudioNode | null = null;
   private ambientGain: GainNode | null = null;
   private currentAmbientType: string = 'none';
+  /**
+   * Preferência "Aviso Sonoro" (settings.pomodoro.soundEnabled).
+   *
+   * O portão fica AQUI, e não em cada chamada: o aviso sonoro é emitido de
+   * dezenas de lugares (concluir tarefa, iniciar/pausar timer, subir de nível,
+   * aviso de prova) e lembrar de consultar a preferência em cada um é exatamente
+   * como o botão virou campo morto. Aqui ele vale para todo mundo.
+   *
+   * Só os efeitos. O ambiente e a trilha do modo foco NÃO passam por este
+   * portão: quem desliga o aviso de fim de tarefa não está pedindo silêncio
+   * durante o foco, e o inverso também.
+   */
+  private soundEnabled = true;
+
+  public setSoundEnabled(enabled: boolean): void {
+    this.soundEnabled = enabled;
+  }
+
+  public isSoundEnabled(): boolean {
+    return this.soundEnabled;
+  }
 
   private getContext(): AudioContext {
     if (!this.ctx) {
@@ -25,6 +46,7 @@ class AudioSynthesizer {
    * Harmonious Tibetan / Zen Pomodoro completion chime
    */
   public playChime(): void {
+    if (!this.soundEnabled) return;
     try {
       const ctx = this.getContext();
       const now = ctx.currentTime;
@@ -58,6 +80,7 @@ class AudioSynthesizer {
    * Short celebratory chord when completing a task or leveling up
    */
   public playSuccessTone(): void {
+    if (!this.soundEnabled) return;
     try {
       const ctx = this.getContext();
       const now = ctx.currentTime;
@@ -84,10 +107,12 @@ class AudioSynthesizer {
   }
 
   public playTaskComplete(): void {
+    if (!this.soundEnabled) return;
     this.playSuccessTone();
   }
 
   public playLevelUp(): void {
+    if (!this.soundEnabled) return;
     try {
       const ctx = this.getContext();
       const now = ctx.currentTime;
@@ -114,6 +139,7 @@ class AudioSynthesizer {
   }
 
   public playTimerStart(): void {
+    if (!this.soundEnabled) return;
     try {
       const ctx = this.getContext();
       const now = ctx.currentTime;
@@ -132,6 +158,7 @@ class AudioSynthesizer {
   }
 
   public playTimerPause(): void {
+    if (!this.soundEnabled) return;
     try {
       const ctx = this.getContext();
       const now = ctx.currentTime;
@@ -292,6 +319,7 @@ class AudioSynthesizer {
    * Exam Mode 30-minute interval gentle chime
    */
   public playExamReminderChime(): void {
+    if (!this.soundEnabled) return;
     try {
       const ctx = this.getContext();
       const now = ctx.currentTime;

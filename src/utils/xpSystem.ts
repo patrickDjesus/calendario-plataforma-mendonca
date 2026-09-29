@@ -1,4 +1,5 @@
 import { Task, StudyMode, UserProfile, Achievement, DailyMission, Flashcard, Priority } from '../types';
+import { tasksForDate } from '../services/recurrence';
 
 export interface StudyModeConfig {
   name: string;
@@ -270,7 +271,7 @@ export function recommendNextTask(
     return { task: null, reason: 'Todas as tarefas foram concluídas! Aproveite para descansar ou planejar o próximo dia.' };
   }
 
-  const todayTasks = pendingTasks.filter(t => t.date === todayISO);
+  const todayTasks = tasksForDate(pendingTasks, todayISO);
   const pool = todayTasks.length > 0 ? todayTasks : pendingTasks;
 
   const currentHour = new Date().getHours();

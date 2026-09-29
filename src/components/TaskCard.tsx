@@ -9,12 +9,14 @@ import {
   Pin, 
   Trash2, 
   Edit3,
-  CloudRain
+  CloudRain,
+  Repeat
 } from 'lucide-react';
 import { Task, Category } from '../types';
 import { CategoryIcon } from './CategoryIcon';
 import { formatSecondsToDigital, formatMinutesHuman } from '../utils/dateUtils';
 import { isHealthCategory } from '../utils/taskCategory';
+import { isRecurring, describeRecurrence } from '../services/recurrence';
 
 interface TaskCardProps {
   task: Task;
@@ -100,6 +102,16 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             <span className="flex items-center gap-1 text-xs font-bold text-sky-600">
               <CloudRain className="w-3.5 h-3.5" />
               Choveu
+            </span>
+          )}
+
+          {isRecurring(task) && (
+            <span
+              className="flex items-center gap-1 text-xs font-bold text-emerald-600"
+              title={describeRecurrence(task) ?? undefined}
+            >
+              <Repeat className="w-3.5 h-3.5" />
+              {describeRecurrence(task) === 'Todo dia' ? 'Todo dia' : 'Rotina'}
             </span>
           )}
 

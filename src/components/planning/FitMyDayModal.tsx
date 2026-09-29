@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Sparkles, Clock, Calendar, Check, ArrowRight } from 'lucide-react';
 import { Task, Category } from '../../types';
 import { formatMinutesHuman } from '../../utils/dateUtils';
+import { tasksForDate } from '../../services/recurrence';
 import { CategoryIcon } from '../CategoryIcon';
 
 interface FitMyDayModalProps {
@@ -28,7 +29,7 @@ export const FitMyDayModal: React.FC<FitMyDayModalProps> = ({
   if (!isOpen) return null;
 
   // Unscheduled pending tasks for today
-  const todayTasks = tasks.filter(t => t.date === todayISO && !t.completed && !t.deletedAt);
+  const todayTasks = tasksForDate(tasks, todayISO).filter(t => !t.completed && !t.deletedAt);
   const unscheduledTasks = todayTasks.filter(t => !t.time);
   const alreadyScheduled = todayTasks.filter(t => !!t.time);
 

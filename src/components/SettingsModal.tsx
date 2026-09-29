@@ -357,6 +357,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     />
                   </div>
                 </div>
+                <div className="mt-3">
+                  <label className="text-xs font-bold text-[var(--texto-suave)] block mb-1">
+                    A cada quantos blocos de foco vem a pausa longa
+                  </label>
+                  <input
+                    type="number"
+                    min={2}
+                    max={12}
+                    value={settings.pomodoro.longBreakInterval}
+                    onChange={(e) => onUpdateSettings({
+                      ...settings,
+                      pomodoro: { ...settings.pomodoro, longBreakInterval: Math.max(2, parseInt(e.target.value, 10) || 4) }
+                    })}
+                    className="w-28 p-2 rounded-xl bg-[var(--surface)] border border-[var(--borda)] text-xs font-bold text-[var(--texto)]"
+                  />
+                  <div className="text-[11px] text-[var(--texto-muted)] mt-1">
+                    Entre os blocos de foco roda a pausa curta. A cada {settings.pomodoro.longBreakInterval} blocos
+                    completados, a pausa é a longa.
+                  </div>
+                </div>
               </div>
 
               {/* Sound and vibration toggles */}

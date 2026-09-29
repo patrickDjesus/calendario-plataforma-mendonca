@@ -21,6 +21,17 @@ import {
 } from './services/supabase';
 import { hasSyncKey, setSyncKey, clearSyncKey } from './services/syncKey';
 import { audioSynthesizer } from './services/audioSynthesizer';
+import {
+  isRecurring,
+  isVirtualId,
+  baseId,
+  occurrenceDate,
+  tasksForDate,
+  withOccurrenceCompleted,
+  withOccurrenceRemoved,
+  withOccurrenceSpent,
+  spentSecondsOn,
+} from './services/recurrence';
 import { CloudOff, Loader2, AlertTriangle, X } from 'lucide-react';
 
 /** Fases da carga: sem nuvem nao ha app, entao isso e estado de verdade. */
@@ -56,8 +67,8 @@ import { FloatingMiniTimer } from './components/FloatingMiniTimer';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { ToastContainer, ToastMessage } from './components/ToastContainer';
 import { MicroConfetti } from './components/MicroConfetti';
-import { getTodayISO, formatDateToISO, formatSecondsToDigital } from './utils/dateUtils';
-import { recommendNextTask, checkAchievements, calculateLevelFromXP, STUDY_MODES } from './utils/xpSystem';
+import { getTodayISO, formatDateToISO, formatSecondsToDigital, getISOWeek } from './utils/dateUtils';
+import { recommendNextTask, checkAchievements, calculateLevelFromXP, calculateStreak, STUDY_MODES } from './utils/xpSystem';
 import { downloadICSFile } from './utils/icsExport';
 import { updateDynamicFavicon } from './utils/dynamicFavicon';
 import { requestNotificationPermission, sendBrowserNotification } from './utils/notifications';
@@ -106,6 +117,12 @@ export default function App() {
 
   // Inactivity tracking
   const lastUserInteractionTime = useRef<number>(Date.now());
+
+  // "Aviso sonoro" e um portao global no sintetizador: efeito de som respeita a
+  // preferencia, ambiente e trilha do modo foco nao (sao som de fundo, nao aviso).
+  useEffect(() => {
+    audioSynthesizer.setSoundEnabled(settings?.pomodoro?.soundEnabled ?? true);
+  }, [settings?.pomodoro?.soundEnabled]);
 
   const todayISO = getTodayISO();
 
@@ -266,12 +283,47 @@ export default function App() {
   // Calculate live elapsed seconds for active task
   const [currentTickElapsed, setCurrentTickElapsed] = useState(0);
 
+  // ==== POMODORO ====
+  // O tempo de foco e o tempo de pausa sao dois contadores porque so o foco
+  // conta como trabalho: a pausa nao pode inflar `spentSeconds` da tarefa nem
+  // disparar o bonus de 25 min do XP.
+  type PomodoroPhase = 'foco' | 'pausa_curta' | 'pausa_longa';
+  const [pomodoroPhase, setPomodoroPhase] = useState<PomodoroPhase>('foco');
+  const [completedFocusBlocks, setCompletedFocusBlocks] = useState(0);
+  const [breakAccumulatedSeconds, setBreakAccumulatedSeconds] = useState(0);
+
+  const pomodoroCfg = settings?.pomodoro;
+
+  const phaseTargetSeconds = useMemo(() => {
+    if (!pomodoroCfg) return 25 * 60;
+    const minutes =
+      pomodoroPhase === 'foco'
+        ? pomodoroCfg.focusMinutes
+        : pomodoroPhase === 'pausa_longa'
+          ? pomodoroCfg.longBreakMinutes
+          : pomodoroCfg.shortBreakMinutes;
+    return Math.max(1, Number(minutes) || 1) * 60;
+  }, [pomodoroCfg, pomodoroPhase]);
+
+  /** O que o anel e o relogio do modo foco mostram: o bloco atual. */
+  const displayElapsed = pomodoroPhase === 'foco' ? currentTickElapsed : breakAccumulatedSeconds;
+
+  // Inicio (Date.now) do segmento atual: quando a fase em curso comecou ou foi
+  // retomada. Cada fase tem um BANCO (`accumulatedTimerSeconds` para foco,
+  // `breakAccumulatedSeconds` para pausa) mais um fragmento vivo medido aqui.
+  const segmentStartRef = useRef<number | null>(null);
+
+  // Ticker: enquanto a fase roda, soma o segmento vivo ao banco da fase.
   useEffect(() => {
     let interval: any = null;
-    if (activeTimerRunning && timerStartTime) {
+    if (activeTimerRunning && timerStartTime && segmentStartRef.current) {
       interval = setInterval(() => {
-        const delta = Math.floor((Date.now() - timerStartTime) / 1000);
-        setCurrentTickElapsed(accumulatedTimerSeconds + delta);
+        const vivo = Math.floor((Date.now() - segmentStartRef.current!) / 1000);
+        if (pomodoroPhase === 'foco') {
+          setCurrentTickElapsed(accumulatedTimerSeconds + vivo);
+        } else {
+          setBreakAccumulatedSeconds(breakAccumulatedSeconds + vivo);
+        }
       }, 500);
     } else {
       setCurrentTickElapsed(accumulatedTimerSeconds);
@@ -279,7 +331,8 @@ export default function App() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [activeTimerRunning, timerStartTime, accumulatedTimerSeconds]);
+  }, [activeTimerRunning, timerStartTime, accumulatedTimerSeconds, pomodoroPhase, breakAccumulatedSeconds]);
+
 
   // Dynamic Browser Favicon & Title Sync
   useEffect(() => {
@@ -297,35 +350,157 @@ export default function App() {
   // XP & Gamification helper
   const addXP = useCallback(async (amount: number) => {
     if (!profile) return;
-    const currentXP = profile.xp || 0;
-    const newXP = currentXP + amount;
-    const levelInfo = calculateLevelFromXP(newXP);
-    const newLevel = levelInfo.level;
-    const todayXP = (profile.xpHistory?.[todayISO] || 0) + amount;
+
+    // A sequencia e a gamificacao andam juntas: quem desliga a gamificacao nao
+    // espera ver streak subindo nem confete. `lastActiveDate` continua sendo
+    // gravado, porque ele tambem resolve conflito de sincronizacao.
+    const gamificacaoAtiva = settings?.gamificationEnabled ?? true;
+
+    // Sequencia: antes de qualquer coisa, o dia de hoje ja conta.
+    const antes = calculateStreak(
+      profile.lastActiveDate,
+      todayISO,
+      profile.streak || 0,
+      profile.streakShieldAvailable ?? true,
+      profile.streakShieldLastUsedWeek,
+    );
 
     const updated = await repository.updateProfile({
-      xp: newXP,
-      level: newLevel,
-      xpHistory: {
-        ...(profile.xpHistory || {}),
-        [todayISO]: todayXP,
-      },
       lastActiveDate: todayISO,
+      ...(gamificacaoAtiva
+        ? {
+            xp: (profile.xp || 0) + amount,
+            level: calculateLevelFromXP((profile.xp || 0) + amount).level,
+            xpHistory: {
+              ...(profile.xpHistory || {}),
+              [todayISO]: (profile.xpHistory?.[todayISO] || 0) + amount,
+            },
+            streak: antes.streak,
+            longestStreak: Math.max(profile.longestStreak || 0, antes.streak),
+            streakShieldAvailable: antes.shieldAvailable,
+            streakShieldLastUsedWeek: antes.shieldUsed ? getISOWeek() : profile.streakShieldLastUsedWeek,
+          }
+        : {}),
     });
     setProfile(updated);
 
-    if (newLevel > profile.level) {
+    if (!gamificacaoAtiva) return;
+
+    if (antes.shieldUsed) {
+      showToast({ text: 'Escudo usado: a sequencia foi salva mesmo com um dia pulado.' });
+    }
+
+    if (updated.level > profile.level) {
       audioSynthesizer.playLevelUp();
       setConfettiActive(true);
       showToast({
-        text: `Parabéns! Você alcançou o Nível ${newLevel} na Plataforma Mendonça!`,
+        text: `Parabéns! Você alcançou o Nível ${updated.level} na Plataforma Mendonça!`,
         type: 'success',
       });
       sendBrowserNotification('Nível Avançado! 🌟', {
-        body: `Parabéns! Você alcançou o Nível ${newLevel} na Plataforma Mendonça!`,
+        body: `Parabéns! Você alcançou o Nível ${updated.level} na Plataforma Mendonça!`,
       });
     }
-  }, [profile, todayISO, showToast]);
+
+    // Conquistas: o mesmo evento que da XP tambem avança o progresso delas.
+    const focoTotal = tasks.reduce((acc, t) => acc + (t.spentSeconds || 0), 0);
+    const { updated: achsAtualizados, newlyUnlocked: novasConquistas } = checkAchievements(achievements, updated, tasks, focoTotal);
+    if (novasConquistas.length > 0) {
+      setAchievements(achsAtualizados);
+      void repository.updateAchievements(achsAtualizados);
+      if (novasConquistas.length === 1) {
+        showToast({ text: `Conquista desbloqueada: ${novasConquistas[0].title}! 🏆`, type: 'success' });
+      } else {
+        showToast({ text: `${novasConquistas.length} conquistas desbloqueadas! 🏆`, type: 'success' });
+      }
+    }
+  }, [profile, todayISO, showToast, settings?.gamificationEnabled, achievements, tasks]);
+
+  /**
+   * A sequencia sozinha nao se arruma: `calculateStreak` so roda quando ha XP
+   * ganho, entao quem abriu o app depois de dois dias ainda veria a sequencia
+   * antiga. Aqui o valor e reconciliado quando o dia vira — e so grava quando
+   * o numero realmente muda, para nao escrever na nuvem a cada abertura.
+   */
+  useEffect(() => {
+    if (!profile) return;
+    if ((settings?.gamificationEnabled ?? true) === false) return;
+    const calculado = calculateStreak(
+      profile.lastActiveDate,
+      todayISO,
+      profile.streak || 0,
+      profile.streakShieldAvailable ?? true,
+      profile.streakShieldLastUsedWeek,
+    );
+    if (calculado.streak === profile.streak && !calculado.shieldUsed) return;
+    void repository.updateProfile({
+      streak: calculado.streak,
+      longestStreak: Math.max(profile.longestStreak || 0, calculado.streak),
+    }).then(setProfile);
+  }, [profile, todayISO, settings?.gamificationEnabled]);
+
+  // Resolve uma referencia de tarefa (id solto ou Task) para a tarefa-base.
+  // Ids virtuais (`serie#2026-09-30`) apontam para a serie, nunca para uma linha.
+  const resolveTaskRef = useCallback((taskOrId: Task | string): { original: Task; iso: string; isOccurrence: boolean } | null => {
+    const id = typeof taskOrId === 'string' ? taskOrId : taskOrId.id;
+    if (isVirtualId(id)) {
+      const base = tasks.find(t => t.id === baseId(id));
+      const iso = occurrenceDate(id);
+      if (base && iso) return { original: base, iso, isOccurrence: true };
+      return null;
+    }
+    const original = tasks.find(t => t.id === id);
+    return original ? { original, iso: original.date, isOccurrence: false } : null;
+  }, [tasks]);
+
+  // Grava tempo de foco na tarefa/ocorrencia correta e atualiza o estado local.
+  const persistFocusTime = useCallback(async (task: Task, extraSec: number) => {
+    if (!extraSec || extraSec <= 0) return;
+    const ref = resolveTaskRef(task);
+    if (!ref) return;
+    const jaTem = spentSecondsOn(ref.original, ref.iso);
+    const saved = await repository.saveTask(withOccurrenceSpent(ref.original, ref.iso, jaTem + extraSec));
+    setTasks(prev => prev.map(t => t.id === saved.id ? saved : t));
+  }, [resolveTaskRef]);
+
+  // Virada de bloco: quando o alvo da fase bate, grava o foco, zera os dois
+  // contadores e inverte a fase, com o segmento recomeçando do zero.
+  useEffect(() => {
+    if (!activeTimerRunning || !activeTask || !timerStartTime) return;
+
+    if (pomodoroPhase === 'foco') {
+      if (currentTickElapsed < phaseTargetSeconds) return;
+      const blocks = completedFocusBlocks + 1;
+      setCompletedFocusBlocks(blocks);
+      audioSynthesizer.playChime();
+
+      // Grava o bloco completo de foco (nunca a pausa) e reinicia a fase.
+      void persistFocusTime(activeTask, phaseTargetSeconds);
+
+      const interval = Math.max(1, pomodoroCfg?.longBreakInterval || 4);
+      const longa = blocks % interval === 0;
+      setAccumulatedTimerSeconds(0);
+      setCurrentTickElapsed(0);
+      setBreakAccumulatedSeconds(0);
+      setPomodoroPhase(longa ? 'pausa_longa' : 'pausa_curta');
+      segmentStartRef.current = Date.now();
+      showToast({
+        text: longa
+          ? `Bloco ${blocks} concluído. Pausa longa de ${pomodoroCfg?.longBreakMinutes ?? 15} min.`
+          : `Bloco ${blocks} concluído. Pausa curta de ${pomodoroCfg?.shortBreakMinutes ?? 5} min.`,
+        type: 'success',
+      });
+    } else {
+      if (breakAccumulatedSeconds < phaseTargetSeconds) return;
+      setPomodoroPhase('foco');
+      setAccumulatedTimerSeconds(0);
+      setCurrentTickElapsed(0);
+      setBreakAccumulatedSeconds(0);
+      segmentStartRef.current = Date.now();
+      showToast({ text: 'Pausa encerrada. De volta ao foco.', type: 'success' });
+    }
+    // A troca de fase no final zera as dependencias; o efeito nao volta a rodar.
+  }, [activeTimerRunning, activeTask, timerStartTime, currentTickElapsed, breakAccumulatedSeconds, phaseTargetSeconds, pomodoroPhase, completedFocusBlocks, pomodoroCfg, showToast, persistFocusTime]);
 
   // Start / Toggle Timer for a specific task
   const handleStartTimer = useCallback((task: Task) => {
@@ -334,40 +509,52 @@ export default function App() {
 
     if (activeTaskId === task.id) {
       if (activeTimerRunning) {
-        // Pause timer
-        const delta = timerStartTime ? Math.floor((Date.now() - timerStartTime) / 1000) : 0;
-        const total = accumulatedTimerSeconds + delta;
-        setAccumulatedTimerSeconds(total);
+        // Pausar: congela o segmento vivo no banco da fase. Foco grava na
+        // tarefa; pausa nao absorve nada.
+        const vivo = segmentStartRef.current ? Math.floor((Date.now() - segmentStartRef.current) / 1000) : 0;
+        if (pomodoroPhase === 'foco') {
+          const total = accumulatedTimerSeconds + vivo;
+          setAccumulatedTimerSeconds(total);
+          setCurrentTickElapsed(total);
+          void persistFocusTime(activeTask || task, vivo);
+        } else {
+          setBreakAccumulatedSeconds(breakAccumulatedSeconds + vivo);
+        }
         setActiveTimerRunning(false);
         setTimerStartTime(null);
-        repository.saveTask({ ...task, spentSeconds: total });
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, spentSeconds: total } : t));
+        segmentStartRef.current = null;
         audioSynthesizer.playTimerPause();
         showToast({ text: `Cronômetro pausado: ${task.title}` });
       } else {
-        // Resume timer
+        // Retoma a fase exatamente de onde parou.
+        segmentStartRef.current = Date.now();
         setTimerStartTime(Date.now());
         setActiveTimerRunning(true);
         audioSynthesizer.playTimerStart();
         showToast({ text: `Foco retomado: ${task.title}`, type: 'success' });
       }
     } else {
-      // Switch task timer
-      if (activeTask && activeTimerRunning) {
-        const delta = timerStartTime ? Math.floor((Date.now() - timerStartTime) / 1000) : 0;
-        const total = accumulatedTimerSeconds + delta;
-        repository.saveTask({ ...activeTask, spentSeconds: total });
-        setTasks(prev => prev.map(t => t.id === activeTask.id ? { ...t, spentSeconds: total } : t));
+      // Trocar de tarefa: se havia foco rolando, congela e grava antes.
+      if (activeTask && activeTimerRunning && pomodoroPhase === 'foco') {
+        const vivo = segmentStartRef.current ? Math.floor((Date.now() - segmentStartRef.current) / 1000) : 0;
+        void persistFocusTime(activeTask, vivo);
+        setAccumulatedTimerSeconds(accumulatedTimerSeconds + vivo);
       }
 
       setActiveTaskId(task.id);
-      setAccumulatedTimerSeconds(task.spentSeconds || 0);
+      setPomodoroPhase('foco');
+      setBreakAccumulatedSeconds(0);
+      // O bloco comeca zerado: o tempo ja gravado na tarefa nao e o bloco atual.
+      setAccumulatedTimerSeconds(0);
+      setCurrentTickElapsed(0);
+      setCompletedFocusBlocks(0);
+      segmentStartRef.current = Date.now();
       setTimerStartTime(Date.now());
       setActiveTimerRunning(true);
       audioSynthesizer.playTimerStart();
       showToast({ text: `Foco iniciado: ${task.title}`, type: 'success' });
     }
-  }, [activeTaskId, activeTimerRunning, timerStartTime, accumulatedTimerSeconds, activeTask, showToast]);
+  }, [activeTaskId, activeTimerRunning, timerStartTime, accumulatedTimerSeconds, activeTask, showToast, pomodoroPhase, breakAccumulatedSeconds, persistFocusTime]);
 
   // Toggle active timer from header or spacebar
   const handleToggleActiveTimer = useCallback(() => {
@@ -389,28 +576,54 @@ export default function App() {
     const isCompleted = !task.completed;
     const now = new Date().toISOString();
 
-    let finalSpent = task.spentSeconds || 0;
-    if (activeTaskId === task.id && activeTimerRunning && timerStartTime) {
-      const delta = Math.floor((Date.now() - timerStartTime) / 1000);
-      finalSpent += delta;
+    const ref = resolveTaskRef(task);
+    const baseTask = ref ? { ...ref.original } : task;
+
+    let finalSpent = ref ? spentSecondsOn(ref.original, ref.iso) : (task.spentSeconds || 0);
+    if (activeTaskId === baseTask.id && activeTimerRunning) {
+      // Congela o segmento vivo agora, para nao perder a fracao final.
+      const vivo = segmentStartRef.current ? Math.floor((Date.now() - segmentStartRef.current) / 1000) : 0;
+      if (pomodoroPhase === 'foco') {
+        finalSpent += vivo;
+        setAccumulatedTimerSeconds(accumulatedTimerSeconds + vivo);
+      } else {
+        // Estava em pausa: so o tempo de foco entra na tarefa.
+        setBreakAccumulatedSeconds(breakAccumulatedSeconds + vivo);
+      }
       setActiveTimerRunning(false);
       setTimerStartTime(null);
-      setAccumulatedTimerSeconds(finalSpent);
+      segmentStartRef.current = null;
+    } else if (activeTaskId === baseTask.id) {
+      setActiveTimerRunning(false);
+      setTimerStartTime(null);
+      segmentStartRef.current = null;
     }
 
-    const updatedTaskData: Task = {
-      ...task,
-      completed: isCompleted,
-      completedAt: isCompleted ? now : undefined,
-      spentSeconds: finalSpent,
-      reflectionNote: note || task.reflectionNote,
-      updatedAt: now,
-    };
+    // A ocorrencia de uma serie volta para a tarefa-base: concluir o dia X
+    // grava so o dia X, e o dia Y da mesma rotina continua pendente.
+    let updatedTaskData: Task;
+
+    if (ref?.isOccurrence) {
+      updatedTaskData = withOccurrenceCompleted(baseTask, ref.iso, isCompleted);
+      updatedTaskData = withOccurrenceSpent(updatedTaskData, ref.iso, finalSpent);
+      if (note) updatedTaskData = { ...updatedTaskData, reflectionNote: note };
+    } else {
+      updatedTaskData = {
+        ...task,
+        completed: isCompleted,
+        completedAt: isCompleted ? now : undefined,
+        spentSeconds: finalSpent,
+        reflectionNote: note || task.reflectionNote,
+        updatedAt: now,
+      };
+    }
 
     const saved = await repository.saveTask(updatedTaskData);
-    setTasks(prev => prev.map(t => t.id === task.id ? saved : t));
+    setTasks(prev => prev.map(t => t.id === updatedTaskData.id ? saved : t));
 
-    if (selectedTaskForDrawer?.id === task.id) {
+    if (ref?.isOccurrence) {
+      if (selectedTaskForDrawer?.id === ref.original.id) setSelectedTaskForDrawer(saved);
+    } else if (selectedTaskForDrawer?.id === updatedTaskData.id) {
       setSelectedTaskForDrawer(saved);
     }
 
@@ -427,11 +640,28 @@ export default function App() {
         type: 'success',
       });
     }
-  }, [activeTaskId, activeTimerRunning, timerStartTime, addXP, showToast, selectedTaskForDrawer]);
+  }, [activeTaskId, activeTimerRunning, timerStartTime, accumulatedTimerSeconds, breakAccumulatedSeconds, addXP, showToast, selectedTaskForDrawer, resolveTaskRef, pomodoroPhase]);
 
   // Save / Update Task handler
   const handleSaveTask = useCallback(async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
-    const saved = await repository.saveTask(taskData);
+    // Editar uma ocorrencia edita a serie inteira. A data da ancora nao pode ser
+    // sobrescrita pela data do dia exibido, senao a serie se parte ao meio.
+    let payload = taskData;
+    if (taskData.id && isVirtualId(taskData.id)) {
+      const ref = resolveTaskRef(taskData.id);
+      if (ref?.isOccurrence) {
+        payload = {
+          ...taskData,
+          id: ref.original.id,
+          date: ref.original.date,
+          completed: ref.original.completed,
+          completedAt: ref.original.completedAt,
+          spentSeconds: ref.original.spentSeconds,
+        } as typeof taskData;
+      }
+    }
+
+    const saved = await repository.saveTask(payload);
     setTasks(prev => {
       const idx = prev.findIndex(t => t.id === saved.id);
       if (idx >= 0) {
@@ -446,8 +676,8 @@ export default function App() {
       setSelectedTaskForDrawer(saved);
     }
 
-    showToast({ text: taskData.id ? 'Tarefa atualizada!' : 'Tarefa criada com sucesso!', type: 'success' });
-  }, [showToast, selectedTaskForDrawer]);
+    showToast({ text: payload.id ? 'Tarefa atualizada!' : 'Tarefa criada com sucesso!', type: 'success' });
+  }, [showToast, selectedTaskForDrawer, resolveTaskRef]);
 
   // Batch Update Tasks
   const handleBatchUpdateTasks = useCallback(async (taskIds: string[], updates: Partial<Task>) => {
@@ -477,6 +707,17 @@ export default function App() {
       setActiveTaskId(null);
       setTimerStartTime(null);
     }
+
+    // Numa serie, apagar remove so o dia; apagar a ancora desliga a serie toda.
+    const ref = resolveTaskRef(taskId);
+    if (ref?.isOccurrence) {
+      const updated = withOccurrenceRemoved(ref.original, ref.iso);
+      const saved = await repository.saveTask(updated);
+      setTasks(prev => prev.map(t => t.id === saved.id ? saved : t));
+      showToast({ text: 'Ocorrência removida. A rotina continua nos outros dias.' });
+      return;
+    }
+
     await repository.softDeleteTask(taskId);
     setTasks(prev => prev.filter(t => t.id !== taskId));
     if (selectedTaskForDrawer?.id === taskId) {
@@ -484,7 +725,7 @@ export default function App() {
       setSelectedTaskForDrawer(null);
     }
     showToast({ text: 'Tarefa enviada para a lixeira (recuperável por 30 dias).' });
-  }, [activeTaskId, selectedTaskForDrawer, showToast]);
+  }, [activeTaskId, selectedTaskForDrawer, showToast, resolveTaskRef]);
 
   // Toggle Top 3
   const handleToggleTop3 = useCallback(async (task: Task) => {
@@ -514,12 +755,14 @@ export default function App() {
 
   // Move task date
   const handleMoveTaskDate = useCallback(async (taskId: string, newDate: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (!task) return;
-    const updated = await repository.saveTask({ ...task, date: newDate });
-    setTasks(prev => prev.map(t => t.id === taskId ? updated : t));
+    const ref = resolveTaskRef(taskId);
+    if (!ref) return;
+    // Arrastar uma ocorrencia move a serie inteira: a ancora e o que define
+    // a partir de quando a rotina vale.
+    const updated = await repository.saveTask({ ...ref.original, date: newDate });
+    setTasks(prev => prev.map(t => t.id === ref.original.id ? updated : t));
     showToast({ text: `Tarefa agendada para ${newDate === todayISO ? 'Hoje' : newDate}` });
-  }, [tasks, todayISO, showToast]);
+  }, [resolveTaskRef, todayISO, showToast]);
 
   // Toggle Subtask
   const handleToggleSubtask = useCallback(async (taskId: string, subtaskId: string) => {
@@ -694,14 +937,37 @@ export default function App() {
   };
 
   const overdueTasks = useMemo(() => {
-    return tasks.filter(t => !t.completed && t.date < todayISO);
+    // Series recorrentes nao ficam "atrasadas": elas reaparecem nos proprios dias.
+    return tasks.filter(t => !t.completed && !t.deletedAt && !isRecurring(t) && t.date < todayISO);
   }, [tasks, todayISO]);
 
   const todayStudiedMinutes = useMemo(() => {
-    const todayTasks = tasks.filter(t => t.date === todayISO);
+    const todayTasks = tasksForDate(tasks, todayISO);
     const totalSecs = todayTasks.reduce((acc, t) => acc + (t.spentSeconds || 0), 0);
     return Math.round(totalSecs / 60);
   }, [tasks, todayISO]);
+
+  /**
+   * Rollover automático. Com a preferencia ligada, o que ficou para trás vem
+   * junto para hoje sem perguntar; desligada, o banner continua perguntando —
+   * por isso os dois caminhos precisam existir, e nao um substitui o outro.
+   *
+   * `dismissedOverdue` respeita a recusa do usuário: quem escolheu "manter onde
+   * estão" não vai ter o cronograma mexido atrás das costas no mesmo dia.
+   */
+  useEffect(() => {
+    if (dismissedOverdue) return;
+    if ((settings?.autoRollover ?? true) === false) return;
+    if (overdueTasks.length === 0) return;
+
+    const ids = overdueTasks.map(t => t.id);
+    const toUpdate = overdueTasks.map(t => ({ ...t, date: todayISO }));
+    void repository.saveTasksBatch(toUpdate).then(() => {
+      setTasks(prev => prev.map(t => (ids.includes(t.id) ? { ...t, date: todayISO } : t)));
+      setDismissedOverdue(true);
+      showToast({ text: `${ids.length} ${ids.length === 1 ? 'tarefa levada' : 'tarefas levadas'} para Hoje (rollover automático).` });
+    });
+  }, [dismissedOverdue, settings?.autoRollover, overdueTasks, todayISO, showToast]);
 
 
   if (boot.phase === 'needs-key') {
@@ -838,7 +1104,7 @@ where user_id = '${boot.userId}';`}
       <FloatingMiniTimer
         activeTask={activeTask}
         activeTimerRunning={activeTimerRunning}
-        activeTimerElapsed={currentTickElapsed}
+        activeTimerElapsed={displayElapsed}
         category={activeCategory}
         onToggleTimer={handleToggleActiveTimer}
         onOpenFullscreenFocus={() => setIsFocusModeOpen(true)}
@@ -850,7 +1116,7 @@ where user_id = '${boot.userId}';`}
         onSelectTab={(tab) => setCurrentTab(tab as any)}
         activeTask={activeTask}
         activeTimerRunning={activeTimerRunning}
-        activeTimerElapsed={currentTickElapsed}
+        activeTimerElapsed={displayElapsed}
         onToggleActiveTimer={handleToggleActiveTimer}
         onStopActiveTimer={handleToggleActiveTimer}
         onOpenFullscreenFocus={() => setIsFocusModeOpen(true)}
@@ -920,7 +1186,7 @@ where user_id = '${boot.userId}';`}
                 settings={settings}
                 activeTask={activeTask}
                 activeTimerRunning={activeTimerRunning}
-                activeTimerElapsed={currentTickElapsed}
+                activeTimerElapsed={displayElapsed}
                 dailyMood={moods[todayISO] || null}
                 onToggleTimer={handleStartTimer}
                 onToggleComplete={handleToggleComplete}
@@ -945,7 +1211,7 @@ where user_id = '${boot.userId}';`}
                 categories={categories}
                 activeTaskId={activeTaskId}
                 activeTimerRunning={activeTimerRunning}
-                activeTimerElapsed={currentTickElapsed}
+                activeTimerElapsed={displayElapsed}
                 onToggleTimer={handleStartTimer}
                 onToggleComplete={handleToggleComplete}
                 onEditTask={(task) => {
@@ -979,7 +1245,7 @@ where user_id = '${boot.userId}';`}
                 settings={settings}
                 activeTask={activeTask}
                 activeTimerRunning={activeTimerRunning}
-                activeTimerElapsed={currentTickElapsed}
+                activeTimerElapsed={displayElapsed}
                 onToggleTimer={handleStartTimer}
                 onToggleComplete={handleToggleComplete}
                 onEditTask={(task) => {
@@ -1075,8 +1341,12 @@ where user_id = '${boot.userId}';`}
         }}
         onCompleteDay={() => {
           addXP(20);
-          setConfettiActive(true);
-          showToast({ text: 'Dia fechado com sucesso (+20 XP)! Bom descanso. 🌙', type: 'success' });
+          if (settings?.gamificationEnabled ?? true) {
+            setConfettiActive(true);
+            showToast({ text: 'Dia fechado com sucesso (+20 XP)! Bom descanso. 🌙', type: 'success' });
+          } else {
+            showToast({ text: 'Dia fechado com sucesso! Bom descanso. 🌙', type: 'success' });
+          }
         }}
       />
 
@@ -1118,10 +1388,12 @@ where user_id = '${boot.userId}';`}
         onClose={() => setIsFocusModeOpen(false)}
         activeTask={activeTask}
         activeTimerRunning={activeTimerRunning}
-        activeTimerElapsed={currentTickElapsed}
+        activeTimerElapsed={displayElapsed}
         onToggleTimer={handleToggleActiveTimer}
         onCompleteTask={handleToggleComplete}
         category={activeCategory}
+        phaseTargetSeconds={phaseTargetSeconds}
+        phaseLabel={pomodoroPhase === 'foco' ? 'Foco' : pomodoroPhase === 'pausa_longa' ? 'Pausa longa' : 'Pausa curta'}
       />
 
       {/* Command Palette (Ctrl+K) */}

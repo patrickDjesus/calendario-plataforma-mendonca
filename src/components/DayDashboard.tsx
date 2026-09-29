@@ -10,6 +10,7 @@ import { NowNextBar } from './NowNextBar';
 import { DailyTimeline } from './DailyTimeline';
 import { STUDY_MODES, getDynamicMotivationPhrase, recommendNextTask } from '../utils/xpSystem';
 import { getTodayISO } from '../utils/dateUtils';
+import { tasksForDate } from '../services/recurrence';
 import { GifIcon } from './GifIcon';
 
 interface DayDashboardProps {
@@ -69,9 +70,9 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
   const missingXp = Math.max(0, dailyXpGoal - todayXp);
   const motivation = getDynamicMotivationPhrase(todayXp, dailyXpGoal);
 
-  // Filter tasks for today
+  // Filter tasks for today, including each recurring series as an occurrence
   const todayTasks = useMemo(() => {
-    return tasks.filter(t => t.date === todayISO && !t.deletedAt);
+    return tasksForDate(tasks, todayISO).filter(t => !t.deletedAt);
   }, [tasks, todayISO]);
 
   // Recommendation for next task

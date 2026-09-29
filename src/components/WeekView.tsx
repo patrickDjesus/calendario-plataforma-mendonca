@@ -4,6 +4,7 @@ import { useInfiniteDays } from '../hooks/useInfiniteDays';
 import { WeekHeader } from './week/WeekHeader';
 import { WeekStrip } from './week/WeekStrip';
 import { formatMinutesHuman } from '../utils/dateUtils';
+import { tasksByDate, tasksForDate } from '../services/recurrence';
 import { CategoryIcon } from './CategoryIcon';
 import { Check, Clock, Play, Pause, Trash2 } from 'lucide-react';
 
@@ -111,10 +112,12 @@ export const WeekView: React.FC<WeekViewProps> = ({
   // Total visible metrics for current month
   const activeTasksList = useMemo(() => tasks.filter(t => !t.deletedAt), [tasks]);
   
-  // Filter tasks belonging to current visible month
+  // Filter tasks belonging to current visible month, counting each day of a
+  // recurring series as an occurrence of its own
   const monthTasks = useMemo(() => {
-    const visibleDates = new Set(days.map(d => d.dateISO));
-    return activeTasksList.filter(t => visibleDates.has(t.date));
+    const visibleDates = days.map(d => d.dateISO);
+    const map = tasksByDate(activeTasksList, visibleDates);
+    return visibleDates.flatMap(d => map.get(d) ?? []);
   }, [activeTasksList, days]);
 
   const totalTasks = monthTasks.length;
@@ -174,7 +177,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
         /* Alternative Dense List Mode */
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 max-w-4xl mx-auto w-full space-y-4">
           {days.map((day) => {
-            const dayTasks = activeTasksList.filter(t => t.date === day.dateISO);
+            const dayTasks = tasksForDate(activeTasksList, day.dateISO);
             if (dayTasks.length === 0) return null;
 
             return (

@@ -18,6 +18,20 @@ export function getTodayISO(): string {
   return formatDateToISO(new Date());
 }
 
+/** Semana no formato YYYY-Www, usada para marcar em que semana o escudo de
+ *  sequência foi gasto (o escudo só se renova de uma semana para outra). */
+export function getISOWeek(isoString: string = getTodayISO()): string {
+  const date = parseISODate(isoString);
+  // Quinta-feira da semana decide o ano ISO: a semana que contém o dia 4/1 é a
+  // semana 1 daquele ano, mesmo que ela comece em dezembro.
+  const thursday = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  thursday.setDate(thursday.getDate() - ((thursday.getDay() + 6) % 7) + 3);
+  const firstThursday = new Date(thursday.getFullYear(), 0, 4);
+  firstThursday.setDate(firstThursday.getDate() - ((firstThursday.getDay() + 6) % 7) + 3);
+  const week = 1 + Math.round((thursday.getTime() - firstThursday.getTime()) / (7 * 24 * 60 * 60 * 1000));
+  return `${thursday.getFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
 export function addDaysToDate(isoString: string, daysToAdd: number): string {
   const date = parseISODate(isoString);
   date.setDate(date.getDate() + daysToAdd);

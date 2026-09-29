@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Clock, AlertTriangle, Play, Plus, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import { Task, Category } from '../types';
 import { formatSecondsToDigital, getTodayISO } from '../utils/dateUtils';
+import { tasksForDate } from '../services/recurrence';
 import { CategoryIcon } from './CategoryIcon';
 
 interface DailyTimelineProps {
@@ -38,7 +39,7 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
 
   const todayISO = getTodayISO();
   const todayTasks = useMemo(() => {
-    return tasks.filter(t => t.date === todayISO && !t.deletedAt);
+    return tasksForDate(tasks, todayISO).filter(t => !t.deletedAt);
   }, [tasks, todayISO]);
 
   const catMap = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories]);
