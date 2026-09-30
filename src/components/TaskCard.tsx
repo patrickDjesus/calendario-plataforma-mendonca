@@ -33,6 +33,7 @@ interface TaskCardProps {
   onToggleSubtask?: (taskId: string, subtaskId: string) => void;
   /** Só chega para tarefas de saúde: marca que choveu e a tarefa ficou inviável. */
   onToggleRain?: (task: Task) => void;
+  onSelectTask?: (task: Task) => void;
 }
 
 export const TaskCard: React.FC<TaskCardProps> = ({
@@ -48,6 +49,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onToggleTop3,
   onTogglePin,
   onToggleRain,
+  onSelectTask,
 }) => {
   const [showMenu, setShowMenu] = useState(false);
 
@@ -64,7 +66,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   return (
     <div
       data-gif-host
-      className={`card-hover group relative py-3.5 px-3 rounded-2xl transition-all duration-150 flex items-center gap-4 ${
+      onClick={() => onSelectTask ? onSelectTask(task) : onToggleTimer(task)}
+      className={`card-hover group relative py-3.5 px-3 rounded-2xl transition-all duration-150 flex items-center gap-4 cursor-pointer ${
         isActiveTimer && isTimerRunning
           ? 'bg-[var(--primary-soft)] ring-1 ring-[var(--primary)]'
           : 'hover:bg-[var(--surface-secondary)]'
@@ -161,7 +164,10 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         
         {/* Play / Pause button (Hover on desktop, always visible on mobile) */}
         <button
-          onClick={() => onToggleTimer(task)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleTimer(task);
+          }}
           className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
             isActiveTimer && isTimerRunning
               ? 'bg-[var(--primary)] text-white shadow-md shadow-blue-500/25'

@@ -26,7 +26,20 @@ import {
   BodyMeasurement,
   ExercisePR,
   DistractionNote,
-  FocusSessionSummary
+  FocusSessionSummary,
+  FocusSession,
+  DailyStat,
+  Subject,
+  Topic,
+  StudyGoal,
+  ReviewItem,
+  QuestionLog,
+  ErrorNote,
+  Objective,
+  Project,
+  PeriodicReview,
+  CustomReward,
+  CloudBackupRecord
 } from '../types';
 import { 
   APP_NAME, 
@@ -43,9 +56,12 @@ import {
   clearLegacyDeviceId,
 } from './syncKey';
 import { calculateSM2 } from '../utils/xpSystem';
+import { applyMigrations, buildInitialDailyStats, CURRENT_SCHEMA_VERSION } from './migrations';
+import { mergeSnapshots } from './syncConflict';
+import { calculateNextReview, ReviewGrade } from '../utils/sm2';
 
 export const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'cat-estudo', name: 'Estudo', color: '#3B6CF5', icon: 'book' },
+  { id: 'cat-estudo', name: 'Estudo', color: '#6366F1', icon: 'book' },
   { id: 'cat-trabalho', name: 'Trabalho', color: '#10B981', icon: 'briefcase' },
   { id: 'cat-pessoal', name: 'Pessoal', color: '#EC4899', icon: 'user' },
   { id: 'cat-saude', name: 'Saúde', color: '#F97316', icon: 'heart-pulse' },
@@ -324,6 +340,7 @@ export function createInitialDatabase(): DatabaseSchema {
   const today = getTodayString();
   return {
     version: DB_VERSION,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     profile: {
       name: 'Patrick',
       avatar: '🚀',
@@ -339,7 +356,7 @@ export function createInitialDatabase(): DatabaseSchema {
     },
     settings: {
       theme: 'auto',
-      accentColor: '#3B6CF5',
+      accentColor: '#6366F1',
       density: 'confortavel',
       fontSize: 'md',
       firstDayOfWeek: 1, // Segunda-feira
@@ -434,6 +451,19 @@ export function createInitialDatabase(): DatabaseSchema {
     distractionNotes: [],
     focusSummaries: [],
     trash: [],
+    focusSessions: [],
+    dailyStats: {},
+    archive: [],
+    subjects: [],
+    topics: [],
+    reviewItems: [],
+    questionLogs: [],
+    errorNotes: [],
+    objectives: [],
+    projects: [],
+    reviews: [],
+    rewards: [],
+    cloudBackups: [],
   };
 }
 
@@ -495,7 +525,7 @@ export function migrateDatabase(parsed: DatabaseSchema): DatabaseSchema {
       c => c.id !== 'cat-matematica' && c.id !== 'cat-fisica'
     );
     if (!parsed.categories.some(c => c.id === 'cat-estudo')) {
-      parsed.categories.unshift({ id: 'cat-estudo', name: 'Estudo', color: '#3B6CF5', icon: 'book' });
+      parsed.categories.unshift({ id: 'cat-estudo', name: 'Estudo', color: '#6366F1', icon: 'book' });
     }
   } else {
     parsed.categories = DEFAULT_CATEGORIES;
@@ -516,7 +546,9 @@ export function migrateDatabase(parsed: DatabaseSchema): DatabaseSchema {
     });
   }
 
-  return parsed;
+  // Executa pipeline ordenado de migrações (Bloco A1)
+  const migrationResult = applyMigrations(parsed);
+  return migrationResult.data;
 }
 
 class DataRepository {
@@ -1383,6 +1415,516 @@ class DataRepository {
     const db = await this.initialize();
     db.trash = [];
     await this.persist(db);
+  }
+
+  // ==== FOCUS SESSIONS (BLOCO A4 & C7) ====
+  public async getFocusSessions(): Promise<FocusSession[]> {
+    const db = await this.initialize();
+    return db.focusSessions || [];
+  }
+
+  public async saveFocusSession(session: FocusSession): Promise<FocusSession> {
+    const db = await this.initialize();
+    if (!db.focusSessions) db.focusSessions = [];
+    const idx = db.focusSessions.findIndex(s => s.id === session.id);
+    if (idx >= 0) {
+      db.focusSessions[idx] = session;
+    } else {
+      db.focusSessions.push(session);
+    }
+
+    // Atualiza spentSeconds na tarefa se vinculada
+    if (session.taskId) {
+      const task = db.tasks.find(t => t.id === session.taskId);
+      if (task) {
+        task.spentSeconds = (task.spentSeconds || 0) + session.actualSeconds;
+        task.updatedAt = new Date().toISOString();
+      }
+    }
+
+    // Atualiza dailyStats
+    const date = session.startedAt.split('T')[0];
+    if (!db.dailyStats) db.dailyStats = {};
+    if (!db.dailyStats[date]) {
+      db.dailyStats[date] = {
+        date,
+        tasksDone: 0,
+        xp: 0,
+        focusSeconds: 0,
+        activeDay: false,
+      };
+    }
+    db.dailyStats[date].focusSeconds += session.actualSeconds;
+    if (session.actualSeconds >= 600) {
+      db.dailyStats[date].activeDay = true;
+    }
+
+    await this.persist(db);
+    return session;
+  }
+
+  // ==== DAILY STATS (BLOCO A5) ====
+  public async getDailyStats(): Promise<Record<string, DailyStat>> {
+    const db = await this.initialize();
+    return db.dailyStats || {};
+  }
+
+  public async rebuildDailyStats(): Promise<Record<string, DailyStat>> {
+    const db = await this.initialize();
+    db.dailyStats = buildInitialDailyStats(db);
+    await this.persist(db);
+    return db.dailyStats;
+  }
+
+  // ==== SUBJECTS & TOPICS (BLOCO D1 & D2) ====
+  public async getSubjects(): Promise<Subject[]> {
+    const db = await this.initialize();
+    return db.subjects || [];
+  }
+
+  public async saveSubject(subject: Subject): Promise<Subject> {
+    const db = await this.initialize();
+    if (!db.subjects) db.subjects = [];
+    const idx = db.subjects.findIndex(s => s.id === subject.id);
+    if (idx >= 0) {
+      db.subjects[idx] = subject;
+    } else {
+      db.subjects.push(subject);
+    }
+    await this.persist(db);
+    return subject;
+  }
+
+  public async deleteSubject(subjectId: string): Promise<void> {
+    const db = await this.initialize();
+    if (db.subjects) {
+      db.subjects = db.subjects.filter(s => s.id !== subjectId);
+    }
+    if (db.topics) {
+      db.topics = db.topics.filter(t => t.subjectId !== subjectId);
+    }
+    await this.persist(db);
+  }
+
+  public async getTopics(subjectId?: string): Promise<Topic[]> {
+    const db = await this.initialize();
+    const all = db.topics || [];
+    return subjectId ? all.filter(t => t.subjectId === subjectId) : all;
+  }
+
+  public async saveTopic(topic: Topic): Promise<Topic> {
+    const db = await this.initialize();
+    if (!db.topics) db.topics = [];
+    const idx = db.topics.findIndex(t => t.id === topic.id);
+    if (idx >= 0) {
+      db.topics[idx] = topic;
+    } else {
+      db.topics.push(topic);
+    }
+    await this.persist(db);
+    return topic;
+  }
+
+  public async deleteTopic(topicId: string): Promise<void> {
+    const db = await this.initialize();
+    if (db.topics) {
+      db.topics = db.topics.filter(t => t.id !== topicId);
+    }
+    await this.persist(db);
+  }
+
+  public async updateTopicStatus(topicId: string, status: Topic['status']): Promise<Topic | null> {
+    const db = await this.initialize();
+    if (!db.topics) return null;
+    const topic = db.topics.find(t => t.id === topicId);
+    if (!topic) return null;
+
+    topic.status = status;
+    topic.ultimoEstudoEm = new Date().toISOString();
+
+    // Se marcou como 'visto', gera automaticamente um item SM-2 para revisão no dia seguinte (Bloco D3)
+    if (status === 'visto') {
+      if (!db.reviewItems) db.reviewItems = [];
+      const existing = db.reviewItems.find(r => r.topicId === topicId);
+      if (!existing) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const yStr = tomorrow.getFullYear();
+        const mStr = String(tomorrow.getMonth() + 1).padStart(2, '0');
+        const dStr = String(tomorrow.getDate()).padStart(2, '0');
+
+        db.reviewItems.push({
+          id: `rev-topic-${topicId}`,
+          kind: 'topic',
+          front: topic.nome,
+          back: `Tópico de estudo da matéria`,
+          topicId: topic.id,
+          subjectId: topic.subjectId,
+          easeFactor: 2.5,
+          intervalDays: 1,
+          repetitions: 0,
+          lapses: 0,
+          dueDate: `${yStr}-${mStr}-${dStr}`,
+          lastReviewedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    await this.persist(db);
+    return topic;
+  }
+
+  public async bulkImportTopics(subjectId: string, rawText: string): Promise<Topic[]> {
+    const db = await this.initialize();
+    if (!db.topics) db.topics = [];
+
+    const lines = rawText.split('\n').map(l => l.trimEnd()).filter(l => l.trim().length > 0);
+    const createdTopics: Topic[] = [];
+    let currentOrder = db.topics.filter(t => t.subjectId === subjectId).length;
+
+    lines.forEach((line) => {
+      const indent = line.search(/\S/);
+      const cleanName = line.trim().replace(/^[-*•\d.]+\s*/, '');
+      if (!cleanName) return;
+
+      const newTopic: Topic = {
+        id: `topic-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        subjectId,
+        nome: cleanName,
+        ordem: currentOrder++,
+        status: 'nao_visto',
+      };
+      createdTopics.push(newTopic);
+      db.topics!.push(newTopic);
+    });
+
+    await this.persist(db);
+    return createdTopics;
+  }
+
+  // ==== GOALS (BLOCO D1 & D2) ====
+  public async getGoals(): Promise<StudyGoal[]> {
+    const db = await this.initialize();
+    return db.goals || [];
+  }
+
+  public async saveGoal(goal: StudyGoal): Promise<StudyGoal> {
+    const db = await this.initialize();
+    if (!db.goals) db.goals = [];
+    const idx = db.goals.findIndex(g => g.id === goal.id);
+    if (idx >= 0) {
+      db.goals[idx] = goal;
+    } else {
+      db.goals.push(goal);
+    }
+    await this.persist(db);
+    return goal;
+  }
+
+  public async deleteGoal(goalId: string): Promise<void> {
+    const db = await this.initialize();
+    if (db.goals) {
+      db.goals = db.goals.filter(g => g.id !== goalId);
+    }
+    await this.persist(db);
+  }
+
+  // ==== SM-2 REVIEW ITEMS (BLOCO D3) ====
+  public async getReviewItems(): Promise<ReviewItem[]> {
+    const db = await this.initialize();
+    return db.reviewItems || [];
+  }
+
+  public async saveReviewItem(item: ReviewItem): Promise<ReviewItem> {
+    const db = await this.initialize();
+    if (!db.reviewItems) db.reviewItems = [];
+    const idx = db.reviewItems.findIndex(r => r.id === item.id);
+    if (idx >= 0) {
+      db.reviewItems[idx] = item;
+    } else {
+      db.reviewItems.push(item);
+    }
+    await this.persist(db);
+    return item;
+  }
+
+  public async submitReviewGrade(itemId: string, grade: ReviewGrade, todayISO: string): Promise<ReviewItem | null> {
+    const db = await this.initialize();
+    if (!db.reviewItems) return null;
+    const item = db.reviewItems.find(r => r.id === itemId);
+    if (!item) return null;
+
+    const sm2 = calculateNextReview(item, grade, todayISO);
+    item.easeFactor = sm2.easeFactor;
+    item.intervalDays = sm2.intervalDays;
+    item.repetitions = sm2.repetitions;
+    item.lapses = sm2.lapses;
+    item.dueDate = sm2.dueDate;
+    item.lastReviewedAt = new Date().toISOString();
+
+    // Se o item for vinculado a um tópico e foi acertado com facilidade (grade >= 4), pode atualizar para 'revisado'/'dominado'
+    if (item.topicId && db.topics) {
+      const topic = db.topics.find(t => t.id === item.topicId);
+      if (topic) {
+        if (item.repetitions >= 3 && topic.status !== 'dominado') {
+          topic.status = 'dominado';
+        } else if (topic.status === 'visto') {
+          topic.status = 'revisado';
+        }
+      }
+    }
+
+    // Recompensa XP de revisão (+2 XP)
+    if (db.profile) {
+      db.profile.xp += 2;
+      const today = todayISO;
+      if (!db.profile.xpHistory) db.profile.xpHistory = {};
+      db.profile.xpHistory[today] = (db.profile.xpHistory[today] || 0) + 2;
+    }
+
+    await this.persist(db);
+    return item;
+  }
+
+  public async deleteReviewItem(itemId: string): Promise<void> {
+    const db = await this.initialize();
+    if (db.reviewItems) {
+      db.reviewItems = db.reviewItems.filter(r => r.id !== itemId);
+    }
+    await this.persist(db);
+  }
+
+  // ==== QUESTION LOGS & ERROR NOTES (BLOCO D4) ====
+  public async getQuestionLogs(subjectId?: string): Promise<QuestionLog[]> {
+    const db = await this.initialize();
+    const all = db.questionLogs || [];
+    return subjectId ? all.filter(q => q.subjectId === subjectId) : all;
+  }
+
+  public async saveQuestionLog(log: QuestionLog): Promise<QuestionLog> {
+    const db = await this.initialize();
+    if (!db.questionLogs) db.questionLogs = [];
+    db.questionLogs.push(log);
+
+    // XP por questões (0.5 XP por questão, max 100)
+    const earnedXp = Math.min(50, Math.round(log.total * 0.5));
+    if (db.profile && earnedXp > 0) {
+      db.profile.xp += earnedXp;
+      const date = log.data;
+      if (!db.profile.xpHistory) db.profile.xpHistory = {};
+      db.profile.xpHistory[date] = (db.profile.xpHistory[date] || 0) + earnedXp;
+    }
+
+    await this.persist(db);
+    return log;
+  }
+
+  public async getErrorNotes(subjectId?: string): Promise<ErrorNote[]> {
+    const db = await this.initialize();
+    const all = db.errorNotes || [];
+    return subjectId ? all.filter(e => e.subjectId === subjectId) : all;
+  }
+
+  public async saveErrorNote(note: ErrorNote): Promise<ErrorNote> {
+    const db = await this.initialize();
+    if (!db.errorNotes) db.errorNotes = [];
+    const idx = db.errorNotes.findIndex(e => e.id === note.id);
+    if (idx >= 0) {
+      db.errorNotes[idx] = note;
+    } else {
+      db.errorNotes.push(note);
+    }
+    await this.persist(db);
+    return note;
+  }
+
+  public async toggleErrorNoteResolved(noteId: string): Promise<void> {
+    const db = await this.initialize();
+    if (!db.errorNotes) return;
+    const note = db.errorNotes.find(e => e.id === noteId);
+    if (note) {
+      note.resolvido = !note.resolvido;
+      await this.persist(db);
+    }
+  }
+
+  public async deleteErrorNote(noteId: string): Promise<void> {
+    const db = await this.initialize();
+    if (db.errorNotes) {
+      db.errorNotes = db.errorNotes.filter(e => e.id !== noteId);
+    }
+    await this.persist(db);
+  }
+
+  // ==== OBJECTIVES & PROJECTS (BLOCO E2) ====
+  public async getObjectives(): Promise<Objective[]> {
+    const db = await this.initialize();
+    return db.objectives || [];
+  }
+
+  public async saveObjective(objective: Objective): Promise<Objective> {
+    const db = await this.initialize();
+    if (!db.objectives) db.objectives = [];
+    const idx = db.objectives.findIndex(o => o.id === objective.id);
+    if (idx >= 0) {
+      db.objectives[idx] = objective;
+    } else {
+      db.objectives.push(objective);
+    }
+    await this.persist(db);
+    return objective;
+  }
+
+  public async deleteObjective(id: string): Promise<void> {
+    const db = await this.initialize();
+    if (db.objectives) {
+      db.objectives = db.objectives.filter(o => o.id !== id);
+    }
+    await this.persist(db);
+  }
+
+  public async getProjects(objectiveId?: string): Promise<Project[]> {
+    const db = await this.initialize();
+    const all = db.projects || [];
+    return objectiveId ? all.filter(p => p.objectiveId === objectiveId) : all;
+  }
+
+  public async saveProject(project: Project): Promise<Project> {
+    const db = await this.initialize();
+    if (!db.projects) db.projects = [];
+    const idx = db.projects.findIndex(p => p.id === project.id);
+    if (idx >= 0) {
+      db.projects[idx] = project;
+    } else {
+      db.projects.push(project);
+    }
+    await this.persist(db);
+    return project;
+  }
+
+  public async deleteProject(id: string): Promise<void> {
+    const db = await this.initialize();
+    if (db.projects) {
+      db.projects = db.projects.filter(p => p.id !== id);
+    }
+    await this.persist(db);
+  }
+
+  public async toggleProjectMilestone(projectId: string, milestoneId: string): Promise<void> {
+    const db = await this.initialize();
+    if (!db.projects) return;
+    const project = db.projects.find(p => p.id === projectId);
+    if (project && project.marcos) {
+      const ms = project.marcos.find(m => m.id === milestoneId);
+      if (ms) {
+        ms.feito = !ms.feito;
+        await this.persist(db);
+      }
+    }
+  }
+
+  // ==== PERIODIC REVIEWS (BLOCO E3) ====
+  public async getPeriodicReviews(): Promise<PeriodicReview[]> {
+    const db = await this.initialize();
+    return db.reviews || [];
+  }
+
+  public async savePeriodicReview(review: PeriodicReview): Promise<PeriodicReview> {
+    const db = await this.initialize();
+    if (!db.reviews) db.reviews = [];
+    const idx = db.reviews.findIndex(r => r.id === review.id);
+    if (idx >= 0) {
+      db.reviews[idx] = review;
+    } else {
+      db.reviews.unshift(review);
+    }
+    await this.persist(db);
+    return review;
+  }
+
+  // ==== CUSTOM REWARDS (BLOCO E5) ====
+  public async getRewards(): Promise<CustomReward[]> {
+    const db = await this.initialize();
+    return db.rewards || [];
+  }
+
+  public async saveReward(reward: CustomReward): Promise<CustomReward> {
+    const db = await this.initialize();
+    if (!db.rewards) db.rewards = [];
+    const idx = db.rewards.findIndex(r => r.id === reward.id);
+    if (idx >= 0) {
+      db.rewards[idx] = reward;
+    } else {
+      db.rewards.push(reward);
+    }
+    await this.persist(db);
+    return reward;
+  }
+
+  public async claimReward(rewardId: string): Promise<void> {
+    const db = await this.initialize();
+    if (!db.rewards) return;
+    const rew = db.rewards.find(r => r.id === rewardId);
+    if (rew) {
+      rew.resgatadoEm = new Date().toISOString();
+      await this.persist(db);
+    }
+  }
+
+  public async deleteReward(rewardId: string): Promise<void> {
+    const db = await this.initialize();
+    if (db.rewards) {
+      db.rewards = db.rewards.filter(r => r.id !== rewardId);
+    }
+    await this.persist(db);
+  }
+
+  // ==== ARCHIVE (BLOCO A6) ====
+  public async getArchivedTasks(): Promise<Task[]> {
+    const db = await this.initialize();
+    return db.archive || [];
+  }
+
+  public async archiveTask(taskId: string): Promise<void> {
+    const db = await this.initialize();
+    if (!db.archive) db.archive = [];
+    const idx = db.tasks.findIndex(t => t.id === taskId);
+    if (idx >= 0) {
+      const [task] = db.tasks.splice(idx, 1);
+      task.archivedAt = new Date().toISOString();
+      db.archive.push(task);
+      await this.persist(db);
+    }
+  }
+
+  public async restoreFromArchive(taskId: string): Promise<Task | null> {
+    const db = await this.initialize();
+    if (!db.archive) return null;
+    const idx = db.archive.findIndex(t => t.id === taskId);
+    if (idx >= 0) {
+      const [task] = db.archive.splice(idx, 1);
+      delete task.archivedAt;
+      db.tasks.push(task);
+      await this.persist(db);
+      return task;
+    }
+    return null;
+  }
+
+  // ==== BACKUP & RESTORE (BLOCO A3) ====
+  public async getCloudBackups(): Promise<Array<{ id: string; snapshot_date: string; created_at: string; data_size: number }>> {
+    return cloudSync.fetchBackups();
+  }
+
+  public async restoreCloudBackup(backupId: string): Promise<boolean> {
+    const current = await this.initialize();
+    // Cria backup pré-restauração por segurança
+    await this.exportFullDatabaseJSON();
+    const backupDb = await cloudSync.fetchBackupById(backupId);
+    if (!backupDb || !isDatabaseShape(backupDb)) return false;
+    const migrated = migrateDatabase(backupDb);
+    await this.persist(migrated);
+    return true;
   }
 
   public async resetToDemo(): Promise<void> {

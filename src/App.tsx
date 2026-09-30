@@ -9,7 +9,13 @@ import {
   Achievement, 
   SpacedRepetitionItem, 
   StudyMode,
-  WorkoutTemplate
+  WorkoutTemplate,
+  Subject,
+  Topic,
+  StudyGoal,
+  ReviewItem,
+  QuestionLog,
+  ErrorNote
 } from './types';
 import { repository, DEFAULT_CATEGORIES, generateUUID } from './services/repository';
 import {
@@ -26,6 +32,7 @@ import {
   isVirtualId,
   baseId,
   occurrenceDate,
+  taskForDate,
   tasksForDate,
   withOccurrenceCompleted,
   withOccurrenceRemoved,
@@ -33,6 +40,48 @@ import {
   spentSecondsOn,
 } from './services/recurrence';
 import { CloudOff, Loader2, AlertTriangle, X } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion, type Variants } from 'motion/react';
+
+/* Transição Elástica: Física de rebote pop dinâmico com descompressão suave */
+const pageVariants: Variants = {
+  initial: (direction: number) => ({
+    opacity: 0,
+    scale: 0.84,
+    y: direction > 0 ? 55 : -55,
+    rotateZ: direction > 0 ? 3 : -3,
+    filter: 'blur(7px)',
+  }),
+  animate: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    rotateZ: 0,
+    filter: 'blur(0px)',
+    transition: {
+      type: 'spring',
+      stiffness: 320,
+      damping: 19,
+      mass: 0.7,
+    },
+  },
+  exit: (direction: number) => ({
+    opacity: 0,
+    scale: 0.86,
+    y: direction > 0 ? -45 : 45,
+    rotateZ: direction > 0 ? -2.5 : 2.5,
+    filter: 'blur(7px)',
+    transition: {
+      duration: 0.19,
+      ease: [0.4, 0, 1, 1] as const,
+    },
+  }),
+};
+
+const reducedVariants: Variants = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.15 } },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
+};
 
 /** Fases da carga: sem nuvem nao ha app, entao isso e estado de verdade. */
 type BootState =
@@ -67,6 +116,7 @@ import { FloatingMiniTimer } from './components/FloatingMiniTimer';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { ToastContainer, ToastMessage } from './components/ToastContainer';
 import { MicroConfetti } from './components/MicroConfetti';
+import { CoverScreen } from './components/CoverScreen';
 import { getTodayISO, formatDateToISO, formatSecondsToDigital, getISOWeek } from './utils/dateUtils';
 import { recommendNextTask, checkAchievements, calculateLevelFromXP, calculateStreak, STUDY_MODES } from './utils/xpSystem';
 import { downloadICSFile } from './utils/icsExport';
@@ -85,9 +135,37 @@ export default function App() {
   const [moods, setMoods] = useState<Record<string, DailyMood>>({});
   const [trash, setTrash] = useState<Array<Task & { originalDeletedAt: string }>>([]);
   const [spacedReps, setSpacedReps] = useState<SpacedRepetitionItem[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [studyGoals, setStudyGoals] = useState<StudyGoal[]>([]);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [questionLogs, setQuestionLogs] = useState<QuestionLog[]>([]);
+  const [errorNotes, setErrorNotes] = useState<ErrorNote[]>([]);
 
   // Navigation & UI state
+  const [showCover, setShowCover] = useState(true);
   const [currentTab, setCurrentTab] = useState<'hoje' | 'tarefas' | 'semana' | 'jornada'>('hoje');
+  const [tabDirection, setTabDirection] = useState<number>(0);
+  const shouldReduceMotion = useReducedMotion();
+
+  const handleSelectTab = useCallback((newTab: string) => {
+    const validTabs: Array<'hoje' | 'tarefas' | 'semana' | 'jornada'> = ['hoje', 'tarefas', 'semana', 'jornada'];
+    if (!validTabs.includes(newTab as any)) return;
+    const target = newTab as 'hoje' | 'tarefas' | 'semana' | 'jornada';
+    if (target === currentTab) return;
+    const tabOrder: Record<'hoje' | 'tarefas' | 'semana' | 'jornada', number> = {
+      hoje: 0,
+      tarefas: 1,
+      semana: 2,
+      jornada: 3,
+    };
+    const prevOrder = tabOrder[currentTab] ?? 0;
+    const nextOrder = tabOrder[target] ?? 0;
+    setTabDirection(nextOrder >= prevOrder ? 1 : -1);
+    setCurrentTab(target);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentTab]);
+
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [confettiActive, setConfettiActive] = useState(false);
   const [dismissedOverdue, setDismissedOverdue] = useState(false);
@@ -117,6 +195,7 @@ export default function App() {
 
   // Inactivity tracking
   const lastUserInteractionTime = useRef<number>(Date.now());
+  const hasRestoredTimerRef = useRef(false);
 
   // "Aviso sonoro" e um portao global no sintetizador: efeito de som respeita a
   // preferencia, ambiente e trilha do modo foco nao (sao som de fundo, nao aviso).
@@ -167,6 +246,12 @@ export default function App() {
         loadedMoods,
         loadedTrash,
         loadedSpaced,
+        loadedSubjects,
+        loadedTopics,
+        loadedGoals,
+        loadedReviewItems,
+        loadedQuestionLogs,
+        loadedErrorNotes,
       ] = await Promise.all([
         repository.getTasks(),
         repository.getCategories(),
@@ -178,6 +263,12 @@ export default function App() {
         repository.getAllMoods(),
         repository.getTrash(),
         repository.getSpacedRepetitions(),
+        repository.getSubjects(),
+        repository.getTopics(),
+        repository.getGoals(),
+        repository.getReviewItems(),
+        repository.getQuestionLogs(),
+        repository.getErrorNotes(),
       ]);
 
       setTasks(loadedTasks);
@@ -190,6 +281,12 @@ export default function App() {
       setMoods(loadedMoods);
       setTrash(loadedTrash);
       setSpacedReps(loadedSpaced);
+      setSubjects(loadedSubjects);
+      setTopics(loadedTopics);
+      setStudyGoals(loadedGoals);
+      setReviewItems(loadedReviewItems);
+      setQuestionLogs(loadedQuestionLogs);
+      setErrorNotes(loadedErrorNotes);
 
       setBoot({ phase: 'ready' });
       // Banco nasceu vazio? A unica explicacao possivel e chave sem linha na
@@ -272,6 +369,15 @@ export default function App() {
 
   // Find currently active task object
   const activeTask = useMemo(() => {
+    if (!activeTaskId) return null;
+    if (isVirtualId(activeTaskId)) {
+      const base = tasks.find(t => t.id === baseId(activeTaskId));
+      const iso = occurrenceDate(activeTaskId);
+      if (base && iso) {
+        return taskForDate(base, iso);
+      }
+      return null;
+    }
     return tasks.find(t => t.id === activeTaskId) || null;
   }, [tasks, activeTaskId]);
 
@@ -284,13 +390,11 @@ export default function App() {
   const [currentTickElapsed, setCurrentTickElapsed] = useState(0);
 
   // ==== POMODORO ====
-  // O tempo de foco e o tempo de pausa sao dois contadores porque so o foco
-  // conta como trabalho: a pausa nao pode inflar `spentSeconds` da tarefa nem
-  // disparar o bonus de 25 min do XP.
   type PomodoroPhase = 'foco' | 'pausa_curta' | 'pausa_longa';
   const [pomodoroPhase, setPomodoroPhase] = useState<PomodoroPhase>('foco');
   const [completedFocusBlocks, setCompletedFocusBlocks] = useState(0);
   const [breakAccumulatedSeconds, setBreakAccumulatedSeconds] = useState(0);
+  const [breakTickElapsed, setBreakTickElapsed] = useState(0);
 
   const pomodoroCfg = settings?.pomodoro;
 
@@ -306,12 +410,15 @@ export default function App() {
   }, [pomodoroCfg, pomodoroPhase]);
 
   /** O que o anel e o relogio do modo foco mostram: o bloco atual. */
-  const displayElapsed = pomodoroPhase === 'foco' ? currentTickElapsed : breakAccumulatedSeconds;
+  const displayElapsed = pomodoroPhase === 'foco' ? currentTickElapsed : breakTickElapsed;
 
   // Inicio (Date.now) do segmento atual: quando a fase em curso comecou ou foi
   // retomada. Cada fase tem um BANCO (`accumulatedTimerSeconds` para foco,
   // `breakAccumulatedSeconds` para pausa) mais um fragmento vivo medido aqui.
   const segmentStartRef = useRef<number | null>(null);
+  // Timestamp ate onde o tempo de foco foi gravado no banco, para garantir que
+  // cada segundo corrido seja salvo exatamente uma vez (sem perda e sem duplicacao).
+  const lastFlushTimestampRef = useRef<number | null>(null);
 
   // Ticker: enquanto a fase roda, soma o segmento vivo ao banco da fase.
   useEffect(() => {
@@ -322,11 +429,12 @@ export default function App() {
         if (pomodoroPhase === 'foco') {
           setCurrentTickElapsed(accumulatedTimerSeconds + vivo);
         } else {
-          setBreakAccumulatedSeconds(breakAccumulatedSeconds + vivo);
+          setBreakTickElapsed(breakAccumulatedSeconds + vivo);
         }
       }, 500);
     } else {
       setCurrentTickElapsed(accumulatedTimerSeconds);
+      setBreakTickElapsed(breakAccumulatedSeconds);
     }
     return () => {
       if (interval) clearInterval(interval);
@@ -343,7 +451,7 @@ export default function App() {
       document.title = `▶ ${timeStr} · ${catName} | Plataforma Mendonça`;
     } else {
       updateDynamicFavicon(false);
-      document.title = 'Plataforma Mendonça · Cockpit de Estudos & Produtividade';
+      document.title = 'Plataforma Mendonça';
     }
   }, [activeTimerRunning, activeTask, currentTickElapsed, activeCategory]);
 
@@ -425,17 +533,32 @@ export default function App() {
   useEffect(() => {
     if (!profile) return;
     if ((settings?.gamificationEnabled ?? true) === false) return;
+
+    // Se o dia de hoje já foi registrado em lastActiveDate, não recalcula/reescreve a streak
+    if (profile.lastActiveDate === todayISO) return;
+
+    // Proteção contra streak corrompido por loop infinito anterior
+    let currentStreak = profile.streak || 0;
+    const historyDates = Object.keys(profile.xpHistory || {});
+    const maxReasonable = Math.max(14, historyDates.length + 7);
+    if (currentStreak > maxReasonable && currentStreak > 30) {
+      currentStreak = Math.max(1, historyDates.length);
+    }
+
     const calculado = calculateStreak(
       profile.lastActiveDate,
       todayISO,
-      profile.streak || 0,
+      currentStreak,
       profile.streakShieldAvailable ?? true,
       profile.streakShieldLastUsedWeek,
     );
-    if (calculado.streak === profile.streak && !calculado.shieldUsed) return;
+
     void repository.updateProfile({
       streak: calculado.streak,
       longestStreak: Math.max(profile.longestStreak || 0, calculado.streak),
+      lastActiveDate: todayISO,
+      streakShieldAvailable: calculado.shieldAvailable,
+      streakShieldLastUsedWeek: calculado.shieldUsed ? getISOWeek() : profile.streakShieldLastUsedWeek,
     }).then(setProfile);
   }, [profile, todayISO, settings?.gamificationEnabled]);
 
@@ -453,18 +576,47 @@ export default function App() {
     return original ? { original, iso: original.date, isOccurrence: false } : null;
   }, [tasks]);
 
-  // Grava tempo de foco na tarefa/ocorrencia correta e atualiza o estado local.
-  const persistFocusTime = useCallback(async (task: Task, extraSec: number) => {
-    if (!extraSec || extraSec <= 0) return;
-    const ref = resolveTaskRef(task);
-    if (!ref) return;
-    const jaTem = spentSecondsOn(ref.original, ref.iso);
-    const saved = await repository.saveTask(withOccurrenceSpent(ref.original, ref.iso, jaTem + extraSec));
+  // Grava tempo de foco na tarefa/ocorrencia correta e atualiza o estado local e nuvem imediatamente.
+  const persistFocusTime = useCallback(async (taskOrId: Task | string, extraSec: number): Promise<Task | null> => {
+    if (!extraSec || extraSec <= 0) return null;
+    const ref = resolveTaskRef(taskOrId);
+    if (!ref) return null;
+
+    // Busca a versao mais recente direto do banco em memoria para nao sofrer de stale closure
+    const freshBaseTask = (await repository.getTaskById(ref.original.id)) || ref.original;
+    const jaTem = spentSecondsOn(freshBaseTask, ref.iso);
+    const updated = withOccurrenceSpent(freshBaseTask, ref.iso, jaTem + extraSec);
+    const saved = await repository.saveTask(updated);
+
+    // Sincroniza estado de tarefas imediatamente
     setTasks(prev => prev.map(t => t.id === saved.id ? saved : t));
+
+    // Sincroniza a tarefa aberta no drawer/modal para nao reter dados defasados
+    setSelectedTaskForDrawer(prev => {
+      if (!prev) return null;
+      if (prev.id === saved.id || prev.id === ref.original.id) {
+        return saved;
+      }
+      return prev;
+    });
+
+    return saved;
   }, [resolveTaskRef]);
 
-  // Virada de bloco: quando o alvo da fase bate, grava o foco, zera os dois
-  // contadores e inverte a fase, com o segmento recomeçando do zero.
+  // Função central para persistir qualquer segundo pendente no momento exato (pause, close modal, beforeunload, etc.)
+  const flushActiveFocusTime = useCallback(async (): Promise<void> => {
+    if (!activeTask || !activeTimerRunning || pomodoroPhase !== 'foco' || !lastFlushTimestampRef.current) {
+      return;
+    }
+    const now = Date.now();
+    const deltaSec = Math.floor((now - lastFlushTimestampRef.current) / 1000);
+    if (deltaSec > 0) {
+      lastFlushTimestampRef.current = now;
+      await persistFocusTime(activeTask, deltaSec);
+    }
+  }, [activeTask, activeTimerRunning, pomodoroPhase, persistFocusTime]);
+
+  // Virada de bloco: quando o alvo da fase bate, grava o foco, zera os contadores e inverte a fase.
   useEffect(() => {
     if (!activeTimerRunning || !activeTask || !timerStartTime) return;
 
@@ -474,87 +626,252 @@ export default function App() {
       setCompletedFocusBlocks(blocks);
       audioSynthesizer.playChime();
 
-      // Grava o bloco completo de foco (nunca a pausa) e reinicia a fase.
-      void persistFocusTime(activeTask, phaseTargetSeconds);
+      // Grava qualquer saldo de foco pendente antes de virar para descanso
+      if (lastFlushTimestampRef.current) {
+        const unpersisted = Math.floor((Date.now() - lastFlushTimestampRef.current) / 1000);
+        if (unpersisted > 0) {
+          void persistFocusTime(activeTask, unpersisted);
+        }
+      }
+      lastFlushTimestampRef.current = null;
 
       const interval = Math.max(1, pomodoroCfg?.longBreakInterval || 4);
       const longa = blocks % interval === 0;
+      const now = Date.now();
       setAccumulatedTimerSeconds(0);
       setCurrentTickElapsed(0);
       setBreakAccumulatedSeconds(0);
+      setBreakTickElapsed(0);
       setPomodoroPhase(longa ? 'pausa_longa' : 'pausa_curta');
-      segmentStartRef.current = Date.now();
+      segmentStartRef.current = now;
+      setTimerStartTime(now);
+      
+      const breakDuration = longa ? (pomodoroCfg?.longBreakMinutes ?? 15) : (pomodoroCfg?.shortBreakMinutes ?? 5);
       showToast({
         text: longa
-          ? `Bloco ${blocks} concluído. Pausa longa de ${pomodoroCfg?.longBreakMinutes ?? 15} min.`
-          : `Bloco ${blocks} concluído. Pausa curta de ${pomodoroCfg?.shortBreakMinutes ?? 5} min.`,
+          ? `Bloco ${blocks} concluído. Pausa longa de ${breakDuration} min.`
+          : `Bloco ${blocks} concluído. Pausa curta de ${breakDuration} min.`,
         type: 'success',
       });
+      sendBrowserNotification('Bloco de Foco Concluído! 🎯', {
+        body: `Excelente trabalho! Bloco ${blocks} concluído. Hora de uma pausa ${longa ? 'longa' : 'curta'} de ${breakDuration} min.`,
+      });
     } else {
-      if (breakAccumulatedSeconds < phaseTargetSeconds) return;
+      if (breakTickElapsed < phaseTargetSeconds) return;
+      const now = Date.now();
       setPomodoroPhase('foco');
       setAccumulatedTimerSeconds(0);
       setCurrentTickElapsed(0);
       setBreakAccumulatedSeconds(0);
-      segmentStartRef.current = Date.now();
+      setBreakTickElapsed(0);
+      segmentStartRef.current = now;
+      setTimerStartTime(now);
+      lastFlushTimestampRef.current = now;
+      audioSynthesizer.playChime();
       showToast({ text: 'Pausa encerrada. De volta ao foco.', type: 'success' });
+      sendBrowserNotification('Fim da Pausa! ⚡', {
+        body: 'Sua pausa acabou! De volta ao foco.',
+      });
     }
     // A troca de fase no final zera as dependencias; o efeito nao volta a rodar.
-  }, [activeTimerRunning, activeTask, timerStartTime, currentTickElapsed, breakAccumulatedSeconds, phaseTargetSeconds, pomodoroPhase, completedFocusBlocks, pomodoroCfg, showToast, persistFocusTime]);
+  }, [activeTimerRunning, activeTask, timerStartTime, currentTickElapsed, breakTickElapsed, phaseTargetSeconds, pomodoroPhase, completedFocusBlocks, pomodoroCfg, showToast, persistFocusTime]);
+
+  // Periodic Auto-Save for Focus Timer (every 10s & on unload)
+  useEffect(() => {
+    if (!activeTimerRunning || !activeTask || pomodoroPhase !== 'foco') return;
+
+    const autoSaveInterval = setInterval(() => {
+      void flushActiveFocusTime();
+    }, 10000);
+
+    const handleBeforeUnload = () => {
+      if (lastFlushTimestampRef.current) {
+        const deltaSec = Math.floor((Date.now() - lastFlushTimestampRef.current) / 1000);
+        if (deltaSec > 0) {
+          void persistFocusTime(activeTask, deltaSec);
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      clearInterval(autoSaveInterval);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [activeTimerRunning, activeTask, pomodoroPhase, flushActiveFocusTime, persistFocusTime]);
+
+  // Back up the active timer state to localStorage synchronously on every tick/state change
+  useEffect(() => {
+    if (activeTaskId) {
+      localStorage.setItem('focosemanal_active_timer_state', JSON.stringify({
+        activeTaskId,
+        activeTimerRunning,
+        timerStartTime,
+        accumulatedTimerSeconds,
+        pomodoroPhase,
+        completedFocusBlocks,
+        breakAccumulatedSeconds,
+        currentTickElapsed,
+        breakTickElapsed,
+        timestamp: Date.now()
+      }));
+    } else {
+      localStorage.removeItem('focosemanal_active_timer_state');
+    }
+  }, [
+    activeTaskId,
+    activeTimerRunning,
+    timerStartTime,
+    accumulatedTimerSeconds,
+    pomodoroPhase,
+    completedFocusBlocks,
+    breakAccumulatedSeconds,
+    currentTickElapsed,
+    breakTickElapsed
+  ]);
+
+  // Restore active timer state on boot (e.g. page refresh / F5)
+  useEffect(() => {
+    if (boot.phase !== 'ready' || hasRestoredTimerRef.current) return;
+    hasRestoredTimerRef.current = true;
+
+    const savedTimerRaw = localStorage.getItem('focosemanal_active_timer_state');
+    if (savedTimerRaw) {
+      try {
+        const savedState = JSON.parse(savedTimerRaw);
+        // Verify task exists in the loaded tasks (allowing virtual/recurring tasks check)
+        const taskExists = tasks.some(t => t.id === savedState.activeTaskId || (isVirtualId(savedState.activeTaskId) && baseId(savedState.activeTaskId) === t.id));
+        if (taskExists) {
+          const timePassedSec = savedState.activeTimerRunning ? Math.floor((Date.now() - savedState.timestamp) / 1000) : 0;
+          
+          // If the page was closed for more than 5 minutes (300 seconds), assume they walked away.
+          // In this case, save their study progress up to the point they closed the tab, then clean up.
+          if (savedState.activeTimerRunning && timePassedSec > 300) {
+            const extraSec = (savedState.currentTickElapsed || 0);
+            if (extraSec > 0 && savedState.pomodoroPhase === 'foco') {
+              void persistFocusTime(savedState.activeTaskId, extraSec);
+            }
+            localStorage.removeItem('focosemanal_active_timer_state');
+            return;
+          }
+
+          setActiveTaskId(savedState.activeTaskId);
+          setPomodoroPhase(savedState.pomodoroPhase || 'foco');
+          setCompletedFocusBlocks(savedState.completedFocusBlocks || 0);
+          
+          if (savedState.activeTimerRunning) {
+            const now = Date.now();
+            segmentStartRef.current = now;
+            setTimerStartTime(now);
+            
+            if (savedState.pomodoroPhase === 'foco') {
+              const totalElapsed = (savedState.currentTickElapsed || 0) + timePassedSec;
+              setAccumulatedTimerSeconds(totalElapsed);
+              setCurrentTickElapsed(totalElapsed);
+              setBreakAccumulatedSeconds(0);
+              setBreakTickElapsed(0);
+              lastFlushTimestampRef.current = now;
+            } else {
+              const totalElapsedBreak = (savedState.breakTickElapsed || 0) + timePassedSec;
+              setBreakAccumulatedSeconds(totalElapsedBreak);
+              setBreakTickElapsed(totalElapsedBreak);
+              setAccumulatedTimerSeconds(0);
+              setCurrentTickElapsed(0);
+            }
+            setActiveTimerRunning(true);
+          } else {
+            setActiveTimerRunning(false);
+            setTimerStartTime(null);
+            segmentStartRef.current = null;
+            
+            setAccumulatedTimerSeconds(savedState.accumulatedTimerSeconds || 0);
+            setCurrentTickElapsed(savedState.currentTickElapsed || 0);
+            setBreakAccumulatedSeconds(savedState.breakAccumulatedSeconds || 0);
+            setBreakTickElapsed(savedState.breakTickElapsed || 0);
+          }
+        } else {
+          localStorage.removeItem('focosemanal_active_timer_state');
+        }
+      } catch (e) {
+        console.warn('Failed to restore active timer state:', e);
+      }
+    }
+  }, [boot.phase, tasks, persistFocusTime]);
 
   // Start / Toggle Timer for a specific task
   const handleStartTimer = useCallback((task: Task) => {
     lastUserInteractionTime.current = Date.now();
-    requestNotificationPermission();
 
     if (activeTaskId === task.id) {
       if (activeTimerRunning) {
-        // Pausar: congela o segmento vivo no banco da fase. Foco grava na
-        // tarefa; pausa nao absorve nada.
+        // Pausar: congela o segmento vivo no banco da fase e persiste imediatamente
         const vivo = segmentStartRef.current ? Math.floor((Date.now() - segmentStartRef.current) / 1000) : 0;
         if (pomodoroPhase === 'foco') {
           const total = accumulatedTimerSeconds + vivo;
           setAccumulatedTimerSeconds(total);
           setCurrentTickElapsed(total);
-          void persistFocusTime(activeTask || task, vivo);
+          if (lastFlushTimestampRef.current) {
+            const unpersisted = Math.floor((Date.now() - lastFlushTimestampRef.current) / 1000);
+            if (unpersisted > 0) {
+              void persistFocusTime(activeTask || task, unpersisted);
+            }
+          }
         } else {
-          setBreakAccumulatedSeconds(breakAccumulatedSeconds + vivo);
+          const totalBreak = breakAccumulatedSeconds + vivo;
+          setBreakAccumulatedSeconds(totalBreak);
+          setBreakTickElapsed(totalBreak);
         }
+        lastFlushTimestampRef.current = null;
         setActiveTimerRunning(false);
         setTimerStartTime(null);
         segmentStartRef.current = null;
         audioSynthesizer.playTimerPause();
-        showToast({ text: `Cronômetro pausado: ${task.title}` });
       } else {
         // Retoma a fase exatamente de onde parou.
-        segmentStartRef.current = Date.now();
-        setTimerStartTime(Date.now());
+        const now = Date.now();
+        segmentStartRef.current = now;
+        setTimerStartTime(now);
+        if (pomodoroPhase === 'foco') {
+          lastFlushTimestampRef.current = now;
+        }
         setActiveTimerRunning(true);
         audioSynthesizer.playTimerStart();
-        showToast({ text: `Foco retomado: ${task.title}`, type: 'success' });
       }
     } else {
-      // Trocar de tarefa: se havia foco rolando, congela e grava antes.
-      if (activeTask && activeTimerRunning && pomodoroPhase === 'foco') {
-        const vivo = segmentStartRef.current ? Math.floor((Date.now() - segmentStartRef.current) / 1000) : 0;
-        void persistFocusTime(activeTask, vivo);
-        setAccumulatedTimerSeconds(accumulatedTimerSeconds + vivo);
+      // Trocar de tarefa: se havia foco rolando, congela e grava tudo antes.
+      if (activeTask && activeTimerRunning && pomodoroPhase === 'foco' && lastFlushTimestampRef.current) {
+        const unpersisted = Math.floor((Date.now() - lastFlushTimestampRef.current) / 1000);
+        if (unpersisted > 0) {
+          void persistFocusTime(activeTask, unpersisted);
+        }
       }
 
+      const now = Date.now();
       setActiveTaskId(task.id);
       setPomodoroPhase('foco');
       setBreakAccumulatedSeconds(0);
-      // O bloco comeca zerado: o tempo ja gravado na tarefa nao e o bloco atual.
+      setBreakTickElapsed(0);
       setAccumulatedTimerSeconds(0);
       setCurrentTickElapsed(0);
       setCompletedFocusBlocks(0);
-      segmentStartRef.current = Date.now();
-      setTimerStartTime(Date.now());
+      segmentStartRef.current = now;
+      setTimerStartTime(now);
+      lastFlushTimestampRef.current = now;
       setActiveTimerRunning(true);
       audioSynthesizer.playTimerStart();
-      showToast({ text: `Foco iniciado: ${task.title}`, type: 'success' });
     }
-  }, [activeTaskId, activeTimerRunning, timerStartTime, accumulatedTimerSeconds, activeTask, showToast, pomodoroPhase, breakAccumulatedSeconds, persistFocusTime]);
+  }, [activeTaskId, activeTimerRunning, accumulatedTimerSeconds, activeTask, pomodoroPhase, breakAccumulatedSeconds, persistFocusTime]);
+
+  // Inicia foco em uma tarefa e leva para a janela de foco imediatamente
+  const handleStartFocusTask = useCallback((task: Task) => {
+    if (activeTaskId === task.id && activeTimerRunning) {
+      handleStartTimer(task);
+    } else {
+      handleStartTimer(task);
+      setIsFocusModeOpen(true);
+    }
+  }, [activeTaskId, activeTimerRunning, handleStartTimer]);
 
   // Toggle active timer from header or spacebar
   const handleToggleActiveTimer = useCallback(() => {
@@ -577,26 +894,30 @@ export default function App() {
     const now = new Date().toISOString();
 
     const ref = resolveTaskRef(task);
-    const baseTask = ref ? { ...ref.original } : task;
+    const freshTask = (ref ? await repository.getTaskById(ref.original.id) : (task.id ? await repository.getTaskById(task.id) : null)) || (ref ? ref.original : task);
+    const baseTask = ref ? freshTask : task;
 
-    let finalSpent = ref ? spentSecondsOn(ref.original, ref.iso) : (task.spentSeconds || 0);
+    let finalSpent = ref ? spentSecondsOn(freshTask, ref.iso) : (freshTask.spentSeconds || 0);
     if (activeTaskId === baseTask.id && activeTimerRunning) {
-      // Congela o segmento vivo agora, para nao perder a fracao final.
-      const vivo = segmentStartRef.current ? Math.floor((Date.now() - segmentStartRef.current) / 1000) : 0;
       if (pomodoroPhase === 'foco') {
-        finalSpent += vivo;
+        const vivo = segmentStartRef.current ? Math.floor((Date.now() - segmentStartRef.current) / 1000) : 0;
         setAccumulatedTimerSeconds(accumulatedTimerSeconds + vivo);
-      } else {
-        // Estava em pausa: so o tempo de foco entra na tarefa.
-        setBreakAccumulatedSeconds(breakAccumulatedSeconds + vivo);
+        if (lastFlushTimestampRef.current) {
+          const unpersisted = Math.floor((Date.now() - lastFlushTimestampRef.current) / 1000);
+          if (unpersisted > 0) {
+            finalSpent += unpersisted;
+          }
+        }
       }
+      lastFlushTimestampRef.current = null;
+      segmentStartRef.current = null;
       setActiveTimerRunning(false);
       setTimerStartTime(null);
-      segmentStartRef.current = null;
     } else if (activeTaskId === baseTask.id) {
+      lastFlushTimestampRef.current = null;
+      segmentStartRef.current = null;
       setActiveTimerRunning(false);
       setTimerStartTime(null);
-      segmentStartRef.current = null;
     }
 
     // A ocorrencia de uma serie volta para a tarefa-base: concluir o dia X
@@ -658,6 +979,19 @@ export default function App() {
           completedAt: ref.original.completedAt,
           spentSeconds: ref.original.spentSeconds,
         } as typeof taskData;
+      }
+    }
+
+    // Protecao contra regressao de tempo de foco: se o banco ja tiver mais tempo gravado do que o payload,
+    // preservamos o tempo mais recente para nenhuma edicao de formulario apagar foco acumulado.
+    if (payload.id) {
+      const freshExisting = await repository.getTaskById(payload.id);
+      if (freshExisting) {
+        payload = {
+          ...payload,
+          spentSeconds: Math.max(freshExisting.spentSeconds || 0, payload.spentSeconds || 0),
+          spentSecondsByDay: { ...(freshExisting.spentSecondsByDay || {}), ...(payload.spentSecondsByDay || {}) },
+        };
       }
     }
 
@@ -822,7 +1156,7 @@ export default function App() {
         }
       } else if (e.key === 't' || e.key === 'T') {
         e.preventDefault();
-        setCurrentTab('hoje');
+        handleSelectTab('hoje');
       } else if (e.key === '?') {
         e.preventDefault();
         setIsShortcutsOpen(true);
@@ -970,12 +1304,20 @@ export default function App() {
   }, [dismissedOverdue, settings?.autoRollover, overdueTasks, todayISO, showToast]);
 
 
+  /** A abertura fica por cima de qualquer fase: a logo roda enquanto o banco carrega. */
+  const withCover = (tela: React.ReactNode) => (
+    <>
+      {showCover && <CoverScreen onDismiss={() => setShowCover(false)} />}
+      {tela}
+    </>
+  );
+
   if (boot.phase === 'needs-key') {
-    return <SyncKeyGate onConnect={handleConnectKey} />;
+    return withCover(<SyncKeyGate onConnect={handleConnectKey} />);
   }
 
   if (boot.phase === 'corrompido') {
-    return (
+    return withCover(
       <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-[var(--surface)] rounded-3xl border border-[var(--borda)] shadow-xl p-8">
           <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center mb-4">
@@ -1008,7 +1350,7 @@ where user_id = '${boot.userId}';`}
   }
 
   if (boot.phase === 'offline') {
-    return (
+    return withCover(
       <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-[var(--surface)] rounded-3xl border border-[var(--borda)] shadow-xl p-8 text-center">
           <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
@@ -1035,10 +1377,10 @@ where user_id = '${boot.userId}';`}
   }
 
   if (boot.phase === 'loading' || !profile || !settings) {
-    return (
+    return withCover(
       <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-3 animate-pulse">
-          <div className="w-12 h-12 rounded-2xl bg-[var(--primary)] flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-500/30">
+          <div className="w-12 h-12 rounded-2xl bg-[var(--primary)] flex items-center justify-center text-white font-black text-xl shadow-lg shadow-violet-500/30">
             M
           </div>
           <span className="text-sm font-bold text-[var(--texto-suave)]">Carregando Plataforma Mendonça...</span>
@@ -1047,8 +1389,8 @@ where user_id = '${boot.userId}';`}
     );
   }
 
-  return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--texto)] flex flex-col antialiased selection:bg-blue-500/20 selection:text-blue-600 transition-colors duration-200">
+  return withCover(
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--texto)] flex flex-col antialiased selection:bg-violet-500/20 selection:text-violet-600 transition-colors duration-200">
       
       {/* Toast Notifications & Confetti */}
       <ToastContainer toasts={toasts} onDismiss={handleDismissToast} />
@@ -1094,9 +1436,9 @@ where user_id = '${boot.userId}';`}
         </div>
       )}
       {syncStatus === 'syncing' && (
-        <div className="sticky top-0 z-50 bg-blue-600 text-white px-4 py-1.5 flex items-center justify-center gap-2 text-[11px] font-bold">
-          <Loader2 size={12} className="animate-spin" />
-          Salvando no Supabase...
+        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full bg-slate-900/90 text-white px-3.5 py-1.5 text-xs font-semibold shadow-lg backdrop-blur-md border border-slate-700/50 pointer-events-none animate-fade-in">
+          <Loader2 size={13} className="animate-spin text-violet-400" />
+          <span>Salvando no Supabase...</span>
         </div>
       )}
 
@@ -1113,7 +1455,7 @@ where user_id = '${boot.userId}';`}
       {/* Global Header (72px) */}
       <Header
         currentTab={currentTab}
-        onSelectTab={(tab) => setCurrentTab(tab as any)}
+        onSelectTab={handleSelectTab}
         activeTask={activeTask}
         activeTimerRunning={activeTimerRunning}
         activeTimerElapsed={displayElapsed}
@@ -1130,11 +1472,6 @@ where user_id = '${boot.userId}';`}
         <WelcomeCard
           profile={profile}
           onWhatToDoNow={() => setIsWhatToDoOpen(true)}
-          onChangeStudyMode={async (mode) => {
-            const updated = await repository.updateProfile({ studyMode: mode });
-            setProfile(updated);
-            showToast({ text: `Modo de estudo alterado para ${STUDY_MODES[mode]?.name || mode} (Meta: ${STUDY_MODES[mode]?.dailyXpGoal || 400} XP/dia)` });
-          }}
           todayStudiedMinutes={todayStudiedMinutes}
         />
 
@@ -1170,110 +1507,131 @@ where user_id = '${boot.userId}';`}
             }}
             onOpenCloseDay={() => setIsCloseDayOpen(true)}
             onOpenTemplates={() => setIsTemplatesOpen(true)}
-            onOpenSpacedRep={() => setCurrentTab('jornada')}
+            onOpenSpacedRep={() => handleSelectTab('jornada')}
             onOpenSettings={(section) => {
               setIsSettingsOpen(true);
             }}
           />
 
-          {/* Dynamic Content Panel */}
+          {/* Dynamic Content Panel with Elastic Page Transition */}
           <div className="flex-1 min-w-0">
-            {currentTab === 'hoje' ? (
-              <DayDashboard
-                tasks={tasks}
-                categories={categories}
-                profile={profile}
-                settings={settings}
-                activeTask={activeTask}
-                activeTimerRunning={activeTimerRunning}
-                activeTimerElapsed={displayElapsed}
-                dailyMood={moods[todayISO] || null}
-                onToggleTimer={handleStartTimer}
-                onToggleComplete={handleToggleComplete}
-                onEditTask={(task) => {
-                  setTaskToEdit(task);
-                  setIsTaskModalOpen(true);
-                }}
-                onDeleteTask={handleDeleteTask}
-                onToggleTop3={handleToggleTop3}
-                onTogglePin={handleTogglePin}
-                onToggleSubtask={handleToggleSubtask}
-                onToggleRain={handleToggleRain}
-                onAddTask={handleSaveTask}
-                onSelectTab={(tab) => setCurrentTab(tab as any)}
-                onSaveMood={handleSaveMood}
-                onOpenTemplates={() => setIsTemplatesOpen(true)}
-                onOpenFocusMode={() => setIsFocusModeOpen(true)}
-              />
-            ) : currentTab === 'tarefas' ? (
-              <TasksInboxView
-                tasks={tasks}
-                categories={categories}
-                activeTaskId={activeTaskId}
-                activeTimerRunning={activeTimerRunning}
-                activeTimerElapsed={displayElapsed}
-                onToggleTimer={handleStartTimer}
-                onToggleComplete={handleToggleComplete}
-                onEditTask={(task) => {
-                  if (task.id) {
-                    handleSaveTask(task);
-                  } else {
-                    handleSaveTask(task);
-                  }
-                }}
-                onDeleteTask={handleDeleteTask}
-                onToggleTop3={handleToggleTop3}
-                onTogglePin={handleTogglePin}
-                onMoveTaskDate={handleMoveTaskDate}
-                onQuickAddTask={(initDate, catId) => {
-                  setTaskToEdit(null);
-                  setModalInitialDate(initDate || undefined);
-                  setIsTaskModalOpen(true);
-                }}
-                onSelectTaskToDrawer={(task) => {
-                  setSelectedTaskForDrawer(task);
-                  setIsDrawerOpen(true);
-                }}
-                onBatchUpdateTasks={handleBatchUpdateTasks}
-                onBatchDeleteTasks={handleBatchDeleteTasks}
-              />
-            ) : currentTab === 'semana' ? (
-              <WeekView
-                tasks={tasks}
-                categories={categories}
-                profile={profile}
-                settings={settings}
-                activeTask={activeTask}
-                activeTimerRunning={activeTimerRunning}
-                activeTimerElapsed={displayElapsed}
-                onToggleTimer={handleStartTimer}
-                onToggleComplete={handleToggleComplete}
-                onEditTask={(task) => {
-                  setTaskToEdit(task);
-                  setIsTaskModalOpen(true);
-                }}
-                onDeleteTask={handleDeleteTask}
-                onToggleTop3={handleToggleTop3}
-                onTogglePin={handleTogglePin}
-                onToggleSubtask={handleToggleSubtask}
-                onMoveTaskDate={handleMoveTaskDate}
-                onQuickAddTaskForDate={(dateISO) => {
-                  setTaskToEdit(null);
-                  setModalInitialDate(dateISO);
-                  setIsTaskModalOpen(true);
-                }}
-                onPlanWeek={() => setIsPlanWeekOpen(true)}
-                onExportICS={() => downloadICSFile(tasks, categories)}
-                onOpenTemplates={() => setIsTemplatesOpen(true)}
-              />
-            ) : (
-              <JourneyView
-                tasks={tasks}
-                categories={categories}
-                profile={profile}
-                moods={moods}
-              />
-            )}
+            <AnimatePresence mode="wait" custom={tabDirection}>
+              <motion.div
+                key={currentTab}
+                custom={tabDirection}
+                variants={shouldReduceMotion ? reducedVariants : pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="w-full transform-gpu"
+              >
+                {currentTab === 'hoje' ? (
+                  <DayDashboard
+                    tasks={tasks}
+                    categories={categories}
+                    profile={profile}
+                    settings={settings}
+                    activeTask={activeTask}
+                    activeTimerRunning={activeTimerRunning}
+                    activeTimerElapsed={displayElapsed}
+                    dailyMood={moods[todayISO] || null}
+                    onToggleTimer={handleStartFocusTask}
+                    onSelectTaskToDrawer={(task) => {
+                      setSelectedTaskForDrawer(task);
+                      setIsDrawerOpen(true);
+                    }}
+                    onToggleComplete={handleToggleComplete}
+                    onEditTask={(task) => {
+                      setTaskToEdit(task);
+                      setIsTaskModalOpen(true);
+                    }}
+                    onDeleteTask={handleDeleteTask}
+                    onToggleTop3={handleToggleTop3}
+                    onTogglePin={handleTogglePin}
+                    onToggleSubtask={handleToggleSubtask}
+                    onToggleRain={handleToggleRain}
+                    onAddTask={handleSaveTask}
+                    onSelectTab={handleSelectTab}
+                    onSaveMood={handleSaveMood}
+                    onOpenTemplates={() => setIsTemplatesOpen(true)}
+                    onOpenFocusMode={() => setIsFocusModeOpen(true)}
+                    onChangeStudyMode={async (mode) => {
+                      const updated = await repository.updateProfile({ studyMode: mode });
+                      setProfile(updated);
+                      showToast({ text: `Modo de estudo alterado para ${STUDY_MODES[mode]?.name || mode} (Meta: ${STUDY_MODES[mode]?.dailyXpGoal || 400} XP/dia)` });
+                    }}
+                  />
+                ) : currentTab === 'tarefas' ? (
+                  <TasksInboxView
+                    tasks={tasks}
+                    categories={categories}
+                    activeTaskId={activeTaskId}
+                    activeTimerRunning={activeTimerRunning}
+                    activeTimerElapsed={displayElapsed}
+                    onToggleTimer={handleStartFocusTask}
+                    onToggleComplete={handleToggleComplete}
+                    onEditTask={(task) => {
+                      if (task.id) {
+                        handleSaveTask(task);
+                      } else {
+                        handleSaveTask(task);
+                      }
+                    }}
+                    onDeleteTask={handleDeleteTask}
+                    onToggleTop3={handleToggleTop3}
+                    onTogglePin={handleTogglePin}
+                    onMoveTaskDate={handleMoveTaskDate}
+                    onQuickAddTask={(initDate, catId) => {
+                      setTaskToEdit(null);
+                      setModalInitialDate(initDate || undefined);
+                      setIsTaskModalOpen(true);
+                    }}
+                    onSelectTaskToDrawer={(task) => {
+                      setSelectedTaskForDrawer(task);
+                      setIsDrawerOpen(true);
+                    }}
+                    onBatchUpdateTasks={handleBatchUpdateTasks}
+                    onBatchDeleteTasks={handleBatchDeleteTasks}
+                  />
+                ) : currentTab === 'semana' ? (
+                  <WeekView
+                    tasks={tasks}
+                    categories={categories}
+                    profile={profile}
+                    settings={settings}
+                    activeTask={activeTask}
+                    activeTimerRunning={activeTimerRunning}
+                    activeTimerElapsed={displayElapsed}
+                    onToggleTimer={handleStartFocusTask}
+                    onToggleComplete={handleToggleComplete}
+                    onEditTask={(task) => {
+                      setTaskToEdit(task);
+                      setIsTaskModalOpen(true);
+                    }}
+                    onDeleteTask={handleDeleteTask}
+                    onToggleTop3={handleToggleTop3}
+                    onTogglePin={handleTogglePin}
+                    onToggleSubtask={handleToggleSubtask}
+                    onMoveTaskDate={handleMoveTaskDate}
+                    onQuickAddTaskForDate={(dateISO) => {
+                      setTaskToEdit(null);
+                      setModalInitialDate(dateISO);
+                      setIsTaskModalOpen(true);
+                    }}
+                    onPlanWeek={() => setIsPlanWeekOpen(true)}
+                    onExportICS={() => downloadICSFile(tasks, categories)}
+                    onOpenTemplates={() => setIsTemplatesOpen(true)}
+                  />
+                ) : (
+                  <JourneyView
+                    tasks={tasks}
+                    categories={categories}
+                    profile={profile}
+                    moods={moods}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
 
         </div>
@@ -1288,7 +1646,8 @@ where user_id = '${boot.userId}';`}
       <TaskDetailDrawer
         isOpen={isDrawerOpen}
         task={selectedTaskForDrawer}
-        onClose={() => {
+        onClose={async () => {
+          await flushActiveFocusTime();
           setIsDrawerOpen(false);
           setSelectedTaskForDrawer(null);
         }}
@@ -1298,12 +1657,19 @@ where user_id = '${boot.userId}';`}
         onDeleteTask={(taskId) => {
           handleDeleteTask(taskId);
         }}
+        onToggleComplete={handleToggleComplete}
         onStartFocus={(task) => {
           handleStartTimer(task);
           setIsFocusModeOpen(true);
         }}
         categories={categories}
         workoutTemplates={workoutTemplates}
+        activeTaskId={activeTaskId}
+        activeTimerRunning={activeTimerRunning}
+        activeTimerElapsed={displayElapsed}
+        pomodoroPhase={pomodoroPhase}
+        completedFocusBlocks={completedFocusBlocks}
+        onToggleActiveTimer={handleToggleActiveTimer}
       />
 
       {/* Close Day Modal ("Fechar o dia") */}
@@ -1385,7 +1751,10 @@ where user_id = '${boot.userId}';`}
       {/* Fullscreen Focus Mode */}
       <FullscreenFocusMode
         isOpen={isFocusModeOpen}
-        onClose={() => setIsFocusModeOpen(false)}
+        onClose={async () => {
+          await flushActiveFocusTime();
+          setIsFocusModeOpen(false);
+        }}
         activeTask={activeTask}
         activeTimerRunning={activeTimerRunning}
         activeTimerElapsed={displayElapsed}
@@ -1394,6 +1763,8 @@ where user_id = '${boot.userId}';`}
         category={activeCategory}
         phaseTargetSeconds={phaseTargetSeconds}
         phaseLabel={pomodoroPhase === 'foco' ? 'Foco' : pomodoroPhase === 'pausa_longa' ? 'Pausa longa' : 'Pausa curta'}
+        pomodoroPhase={pomodoroPhase}
+        completedFocusBlocks={completedFocusBlocks}
       />
 
       {/* Command Palette (Ctrl+K) */}
@@ -1402,7 +1773,7 @@ where user_id = '${boot.userId}';`}
         onClose={() => setIsCommandPaletteOpen(false)}
         tasks={tasks}
         categories={categories}
-        onSelectTab={(tab) => setCurrentTab(tab as any)}
+        onSelectTab={(tab) => handleSelectTab(tab as any)}
         onStartTimer={(task) => {
           handleStartTimer(task);
           setIsFocusModeOpen(true);

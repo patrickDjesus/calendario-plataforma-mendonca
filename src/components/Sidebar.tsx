@@ -106,7 +106,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={item.action}
               className={`w-full py-2.5 px-1 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer group ${
                 item.isPrimary
-                  ? 'bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-md shadow-blue-500/30'
+                  ? 'bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-md shadow-violet-500/30'
                   : 'text-slate-300 hover:text-white hover:bg-[var(--sidebar-surface)]'
               }`}
               title={`${item.label1} ${item.label2}`}

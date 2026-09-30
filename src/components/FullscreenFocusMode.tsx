@@ -19,6 +19,7 @@ import { formatSecondsToDigital, formatMinutesHuman } from '../utils/dateUtils';
 import { repository } from '../services/repository';
 import { CategoryIcon } from './CategoryIcon';
 import { FocusAudioPanel } from './FocusAudioPanel';
+import { PomodoroRoadmap } from './PomodoroRoadmap';
 
 interface FullscreenFocusModeProps {
   isOpen: boolean;
@@ -29,9 +30,10 @@ interface FullscreenFocusModeProps {
   onToggleTimer: () => void;
   onCompleteTask: (task: Task, reflectionNote?: string, enableSpacedRepetition?: boolean) => void;
   category?: Category;
-  /** Fase do Pomodoro em curso; 0 = sem bloco configurado. */
   phaseTargetSeconds?: number;
   phaseLabel?: string;
+  pomodoroPhase?: 'foco' | 'pausa_curta' | 'pausa_longa';
+  completedFocusBlocks?: number;
 }
 
 export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
@@ -45,6 +47,8 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
   category,
   phaseTargetSeconds = 0,
   phaseLabel,
+  pomodoroPhase = 'foco',
+  completedFocusBlocks = 0,
 }) => {
   const [reflectionNote, setReflectionNote] = useState('');
   const [obstacleNote, setObstacleNote] = useState('');
@@ -54,6 +58,21 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
   const [distractionText, setDistractionText] = useState('');
   const [examMode, setExamMode] = useState(false);
   const [pausesCount, setPausesCount] = useState(0);
+  const [sessionType, setSessionType] = useState<'teoria' | 'questoes' | 'revisao' | 'outro'>('teoria');
+  const [sessionRating, setSessionRating] = useState<number>(5);
+
+  // Wake Lock API (Bloco C7)
+  useEffect(() => {
+    let lock: any = null;
+    if (isOpen && typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
+      (navigator as any).wakeLock.request('screen').then((l: any) => {
+        lock = l;
+      }).catch(() => {});
+    }
+    return () => {
+      if (lock) lock.release().catch(() => {});
+    };
+  }, [isOpen]);
 
   // Track pause count
   useEffect(() => {
@@ -92,8 +111,24 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
   };
 
   const confirmFinish = async () => {
-    // Save session summary
     const todayISO = new Date().toISOString().split('T')[0];
+    const nowISO = new Date().toISOString();
+
+    // 1. Grava FocusSession oficial (Bloco A4 & C7)
+    await repository.saveFocusSession({
+      id: `session-${Date.now()}`,
+      taskId: activeTask.id,
+      subjectId: activeTask.subjectId,
+      topicId: activeTask.topicId,
+      type: sessionType,
+      startedAt: new Date(Date.now() - activeTimerElapsed * 1000).toISOString(),
+      endedAt: nowISO,
+      plannedSeconds: (activeTask.estimatedMinutes || 25) * 60,
+      actualSeconds: activeTimerElapsed,
+      interrupted: pausesCount > 2,
+      rating: sessionRating,
+    });
+
     await repository.saveFocusSummary({
       date: todayISO,
       startTime: new Date().toLocaleTimeString().slice(0, 5),
@@ -180,92 +215,108 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
         </div>
       </div>
 
-      {/* Center: Giant Ring & Digital Chronometer */}
-      <div className="relative z-10 flex flex-col items-center justify-center my-auto">
-        <div className="relative w-80 h-80 sm:w-96 sm:h-96 flex items-center justify-center">
-          
-          {/* Circular Progress Gauge */}
-          <svg className="w-full h-full transform -rotate-90">
-            <circle
-              cx="50%"
-              cy="50%"
-              r={radius}
-              className="text-slate-200"
-              strokeWidth="12"
-              stroke="currentColor"
-              fill="transparent"
-            />
-            <circle
-              cx="50%"
-              cy="50%"
-              r={radius}
-              className="text-[var(--primary)] transition-all duration-700 ease-out"
-              strokeWidth="12"
-              strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              stroke="url(#focusGradient)"
-              fill="transparent"
-            />
-            <defs>
-              <linearGradient id="focusGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#3B6CF5" />
-                <stop offset="50%" stopColor="#818CF8" />
-                <stop offset="100%" stopColor="#38BDF8" />
-              </linearGradient>
-            </defs>
-          </svg>
-
-          {/* Time & Task Inside Ring */}
-          <div className="absolute flex flex-col items-center justify-center text-center px-6">
-            <span className="text-5xl sm:text-7xl font-black font-mono tracking-widest text-[#0F172A] tabular-nums">
-              {formatSecondsToDigital(activeTimerElapsed)}
-            </span>
+      {/* Main Content: Center Cockpit + Right Side Always-Visible Roadmap */}
+      <div className="relative z-10 flex-1 flex flex-col lg:flex-row items-center justify-center max-w-6xl mx-auto w-full my-auto gap-8 px-2 sm:px-6 py-4 overflow-y-auto lg:overflow-visible">
+        
+        {/* Central Focus Cockpit: Giant Ring & Digital Chronometer & Action Buttons */}
+        <div className="flex-1 flex flex-col items-center justify-center w-full max-w-lg mx-auto">
+          <div className="relative w-72 h-72 sm:w-88 sm:h-88 flex items-center justify-center">
             
-            <div className="mt-3 flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${activeTimerRunning ? 'bg-emerald-500 animate-ping' : 'bg-amber-500'}`} />
-              <span className="text-xs uppercase font-extrabold tracking-widest text-slate-500">
-                {activeTimerRunning ? 'Hiperfoco Ativo' : 'Sessão Pausada'}
-              </span>
-            </div>
+            {/* Circular Progress Gauge */}
+            <svg className="w-full h-full transform -rotate-90">
+              <circle
+                cx="50%"
+                cy="50%"
+                r={radius}
+                className="text-slate-200"
+                strokeWidth="12"
+                stroke="currentColor"
+                fill="transparent"
+              />
+              <circle
+                cx="50%"
+                cy="50%"
+                r={radius}
+                className="text-[var(--primary)] transition-all duration-700 ease-out"
+                strokeWidth="12"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                stroke="url(#focusGradient)"
+                fill="transparent"
+              />
+              <defs>
+                <linearGradient id="focusGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#3B6CF5" />
+                  <stop offset="50%" stopColor="#818CF8" />
+                  <stop offset="100%" stopColor="#38BDF8" />
+                </linearGradient>
+              </defs>
+            </svg>
 
-            {activeTask.estimatedMinutes && (
-              <span className="text-xs text-slate-500 mt-1 font-medium">
-                Meta: {formatMinutesHuman(activeTask.estimatedMinutes)} ({progressPercent}%)
+            {/* Time & Task Inside Ring */}
+            <div className="absolute flex flex-col items-center justify-center text-center px-6">
+              <span className="text-5xl sm:text-6xl font-black font-mono tracking-widest text-[#0F172A] tabular-nums">
+                {formatSecondsToDigital(activeTimerElapsed)}
               </span>
-            )}
+              
+              <div className="mt-2.5 flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${activeTimerRunning ? 'bg-blue-600 animate-ping' : 'bg-amber-500'}`} />
+                <span className="text-xs uppercase font-extrabold tracking-widest text-slate-500">
+                  {pomodoroPhase === 'foco' ? (activeTimerRunning ? 'Foco Ativo' : 'Foco Pausado') : 'Tempo de Descanso'}
+                </span>
+              </div>
+
+              {activeTask.estimatedMinutes && (
+                <span className="text-xs text-slate-500 mt-1 font-medium">
+                  Meta: {formatMinutesHuman(activeTask.estimatedMinutes)} ({progressPercent}%)
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Task Title in Big Bold Typography */}
+          <h1 className="text-xl sm:text-2xl font-black text-[#0F172A] mt-4 mb-6 max-w-xl text-center leading-snug">
+            {activeTask.title}
+          </h1>
+
+          {/* Action Controls */}
+          <div className="flex items-center justify-center gap-4 w-full max-w-md">
+            {/* Pause / Resume */}
+            <button
+              onClick={onToggleTimer}
+              className={`flex-1 py-3.5 px-6 rounded-2xl font-extrabold text-sm sm:text-base flex items-center justify-center gap-3 transition-all cursor-pointer shadow-lg ${
+                activeTimerRunning
+                  ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
+                  : 'bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-blue-500/40'
+              }`}
+            >
+              {activeTimerRunning ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
+              <span>{activeTimerRunning ? 'Pausar' : 'Retomar'}</span>
+            </button>
+
+            {/* Complete Task */}
+            <button
+              onClick={handleFinish}
+              className="flex-1 py-3.5 px-6 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Check className="w-5 h-5 stroke-[3]" />
+              <span>Concluir (+XP)</span>
+            </button>
           </div>
         </div>
 
-        {/* Task Title in Big Bold Typography */}
-        <h1 className="text-xl sm:text-2xl font-black text-[#0F172A] mt-6 max-w-2xl text-center leading-snug">
-          {activeTask.title}
-        </h1>
-      </div>
-
-      {/* Bottom Action Controls */}
-      <div className="relative z-10 flex items-center justify-center gap-4 max-w-md mx-auto w-full">
-        {/* Pause / Resume */}
-        <button
-          onClick={onToggleTimer}
-          className={`flex-1 py-4 px-6 rounded-2xl font-extrabold text-sm sm:text-base flex items-center justify-center gap-3 transition-all cursor-pointer shadow-lg ${
-            activeTimerRunning
-              ? 'bg-amber-500 hover:bg-amber-600 text-slate-950'
-              : 'bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-blue-500/40'
-          }`}
-        >
-          {activeTimerRunning ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
-          <span>{activeTimerRunning ? 'Pausar (Espaço)' : 'Retomar (Espaço)'}</span>
-        </button>
-
-        {/* Complete Task */}
-        <button
-          onClick={handleFinish}
-          className="flex-1 py-4 px-6 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-        >
-          <Check className="w-5 h-5 stroke-[3]" />
-          <span>Concluir (+XP)</span>
-        </button>
+        {/* Right Side: Always-Visible Simplified Journey Roadmap */}
+        <div className="w-full lg:w-80 shrink-0">
+          <PomodoroRoadmap
+            estimatedMinutes={activeTask.estimatedMinutes || 90}
+            spentSeconds={activeTask.spentSeconds || 0}
+            completedFocusBlocks={completedFocusBlocks}
+            currentPhase={pomodoroPhase}
+            isTimerRunning={activeTimerRunning}
+            activeTimerElapsed={activeTimerElapsed}
+          />
+        </div>
       </div>
 
       {/* Anotar Distração Modal */}

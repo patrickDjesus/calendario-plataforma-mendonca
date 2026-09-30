@@ -1,6 +1,6 @@
 export type Priority = 'baixa' | 'media' | 'alta' | 'urgente';
 
-export type StudyMode = 'leve' | 'regular' | 'intenso';
+export type StudyMode = 'leve' | 'regular' | 'intenso' | 'caverna';
 
 export interface Category {
   id: string;
@@ -96,18 +96,24 @@ export interface NutritionHydrationDetails {
 // ----------------------------------------------------
 // FASE 3B: Modelos para Conteúdo das Matérias (Árvore Matéria -> Módulo -> Tópico)
 // ----------------------------------------------------
-export type TopicStatus = 'nao_iniciado' | 'estudando' | 'revisando' | 'dominado';
+export type TopicStatus = 'nao_iniciado' | 'estudando' | 'revisando' | 'dominado' | 'nao_visto' | 'visto' | 'revisado';
 
 export interface Topic {
   id: string;
-  name: string;
+  name?: string;
+  nome?: string;
+  subjectId?: string;
+  parentId?: string;
   status: TopicStatus;
-  sources: string[]; // ex: ["Livro Halliday Cap. 3", "Videoaula 12"]
-  questionsDone: number;
-  questionsCorrect: number;
+  sources?: string[]; // ex: ["Livro Halliday Cap. 3", "Videoaula 12"]
+  questionsDone?: number;
+  questionsCorrect?: number;
   lastReviewedAt?: string;
   nextReviewAt?: string;
   revisionStage?: number; // 1 (1 dia), 2 (7 dias), 3 (30 dias)
+  ordem?: number;
+  ultimoEstudoEm?: string;
+  notas?: string;
 }
 
 export interface Module {
@@ -170,6 +176,21 @@ export interface Task {
   details?: TaskDetails;
   attachments?: Attachment[];
   activityLog?: ActivityLog[];
+  // Bloco C & D: Recorrência flexível, hábitos, estimativas, matérias e projetos
+  recurrenceRule?: {
+    type: 'diaria' | 'semanal' | 'mensal' | 'cada_n_dias';
+    interval: number;
+    weekdays?: number[];
+    vezesPorSemana?: number;
+    ate?: string;
+  };
+  isHabit?: boolean;
+  vezesPorSemana?: number;
+  postponeCount?: number;
+  subjectId?: string;
+  topicId?: string;
+  projectId?: string;
+  archivedAt?: string | null;
 }
 
 export interface DailyMood {
@@ -399,6 +420,170 @@ export interface UserSettings {
   onboardingCompleted: boolean;
   dashboardCards?: DashboardCardConfig[];
   lastBackupExportPrompt?: string; // YYYY-MM-DD
+  // Bloco B, C, D, E
+  animations?: 'completa' | 'suave' | 'desligada';
+  splashMode?: 'diaria' | 'sempre' | 'nunca';
+  dailyCapacityMinutes?: Record<number, number>; // 0 (Dom) a 6 (Sáb) -> minutos planejados
+  notificationsEnabled?: boolean;
+  notificationTimes?: {
+    taskReminderMin: number;
+    dailyReviewTime: string; // HH:mm
+    closeDayTime: string; // HH:mm
+  };
+  dailyReviewLimit?: number; // padrão 30
+  accuracyThreshold?: number; // padrão 70%
+  aiEnabled?: boolean;
+  aiSendNotes?: boolean;
+  minimumDayMode?: boolean;
+}
+
+export interface FocusSession {
+  id: string;
+  taskId?: string;
+  subjectId?: string;
+  topicId?: string;
+  type: 'teoria' | 'questoes' | 'revisao' | 'outro';
+  startedAt: string;
+  endedAt: string;
+  plannedSeconds: number;
+  actualSeconds: number;
+  interrupted: boolean;
+  rating?: number; // 1 a 5
+}
+
+export interface DailyStat {
+  date: string; // YYYY-MM-DD
+  tasksDone: number;
+  xp: number;
+  focusSeconds: number;
+  mood?: 'otimo' | 'bom' | 'neutro' | 'cansado' | 'estressado';
+  energy?: number;
+  activeDay: boolean;
+}
+
+export interface Subject {
+  id: string;
+  nome: string;
+  cor: string;
+  metaSemanalMin: number;
+  createdAt: string;
+}
+
+export interface StudyGoal {
+  id: string;
+  nome: string;
+  data: string; // YYYY-MM-DD
+  subjectIds: string[];
+}
+
+export interface ReviewItem {
+  id: string;
+  kind: 'card' | 'topic';
+  front?: string;
+  back?: string;
+  topicId?: string;
+  subjectId?: string;
+  easeFactor: number; // default 2.5
+  intervalDays: number;
+  repetitions: number;
+  lapses: number;
+  dueDate: string; // YYYY-MM-DD
+  lastReviewedAt?: string;
+}
+
+export interface QuestionLog {
+  id: string;
+  data: string; // YYYY-MM-DD
+  subjectId: string;
+  topicId?: string;
+  total: number;
+  acertos: number;
+  tipo: 'questoes' | 'simulado';
+  duracaoMin?: number;
+  fonte?: string;
+}
+
+export interface ErrorNote {
+  id: string;
+  subjectId?: string;
+  topicId?: string;
+  texto: string;
+  criadoEm: string;
+  resolvido: boolean;
+}
+
+export interface Objective {
+  id: string;
+  titulo: string;
+  title?: string;
+  description?: string;
+  horizonte?: 'ano' | 'trimestre' | 'mes';
+  horizon?: 'ano' | 'trimestre' | 'mes';
+  periodo?: string; // ex: "2026", "2026-Q4", "2026-10"
+  status: 'em_andamento' | 'concluido' | 'cancelado' | 'pausado';
+  progress?: number;
+  createdAt?: string;
+}
+
+export interface ProjectMilestone {
+  id: string;
+  titulo: string;
+  data: string;
+  feito: boolean;
+}
+
+export interface Project {
+  id: string;
+  objectiveId?: string;
+  titulo?: string;
+  name?: string;
+  marcos?: ProjectMilestone[];
+  status: 'ativo' | 'concluido' | 'arquivado' | 'planejado' | 'em_andamento' | 'pausado';
+  createdAt?: string;
+}
+
+export interface PeriodicReview {
+  id: string;
+  tipo: 'semanal' | 'mensal' | 'trimestral';
+  periodo: string; // ex: "2026-W40"
+  data?: string; // YYYY-MM-DD
+  createdAt?: string;
+  focusHours?: number;
+  tasksDone?: number;
+  activeDays?: number;
+  subjectHours?: Record<string, number>;
+  ans1?: string; // O que rendeu?
+  ans2?: string; // O que travou?
+  ans3?: string; // O que muda na próxima semana?
+  nextGoals?: string[];
+  respostas?: {
+    oQueFuncionou?: string;
+    oQueTravou?: string;
+    oQueAjustar?: string;
+  };
+  statsCalculadas?: {
+    tarefasConcluidas: number;
+    horasFoco: number;
+    diasAtivos: number;
+  };
+  metasProximoCiclo?: string[];
+}
+
+export interface CustomReward {
+  id: string;
+  titulo: string;
+  metrica: 'horasFoco' | 'diasAtivos' | 'tarefas' | 'revisoes';
+  alvo: number;
+  periodo: 'semana' | 'mes';
+  resgatadoEm?: string;
+}
+
+export interface CloudBackupRecord {
+  id: string;
+  snapshot_date: string;
+  data_size: number;
+  created_at: string;
+  source: 'auto' | 'manual' | 'pre_restore';
 }
 
 export interface SpacedRepetitionItem {
@@ -414,6 +599,7 @@ export interface SpacedRepetitionItem {
 
 export interface DatabaseSchema {
   version: number;
+  schemaVersion?: number; // Bloco A1: rastreamento de migrações sequenciais
   profile: UserProfile;
   settings: UserSettings;
   categories: Category[];
@@ -435,5 +621,20 @@ export interface DatabaseSchema {
   distractionNotes?: DistractionNote[];
   focusSummaries?: FocusSessionSummary[];
   trash: Array<Task & { originalDeletedAt: string }>;
+  // Bloco A a E
+  focusSessions?: FocusSession[];
+  dailyStats?: Record<string, DailyStat>;
+  archive?: Task[];
+  subjects?: Subject[];
+  topics?: Topic[];
+  goals?: StudyGoal[];
+  reviewItems?: ReviewItem[];
+  questionLogs?: QuestionLog[];
+  errorNotes?: ErrorNote[];
+  objectives?: Objective[];
+  projects?: Project[];
+  reviews?: PeriodicReview[];
+  rewards?: CustomReward[];
+  cloudBackups?: CloudBackupRecord[];
 }
 

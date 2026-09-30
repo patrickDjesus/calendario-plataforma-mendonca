@@ -29,6 +29,12 @@ const ToastItem: React.FC<{ toast: ToastMessage; onDismiss: () => void }> = ({ t
   const duration = toast.durationMs || 5000;
   const [progress, setProgress] = useState(100);
 
+  // Use a ref for onDismiss to prevent resetting the interval when onDismiss changes
+  const onDismissRef = React.useRef(onDismiss);
+  useEffect(() => {
+    onDismissRef.current = onDismiss;
+  }, [onDismiss]);
+
   useEffect(() => {
     const startTime = Date.now();
     const interval = setInterval(() => {
@@ -37,12 +43,12 @@ const ToastItem: React.FC<{ toast: ToastMessage; onDismiss: () => void }> = ({ t
       setProgress(remaining);
       if (remaining <= 0) {
         clearInterval(interval);
-        onDismiss();
+        onDismissRef.current();
       }
     }, 50);
 
     return () => clearInterval(interval);
-  }, [duration, onDismiss]);
+  }, [duration]);
 
   return (
     <div className="pointer-events-auto rounded-2xl bg-slate-900 text-white p-3.5 shadow-2xl border border-slate-700 flex flex-col overflow-hidden animate-fadeIn">

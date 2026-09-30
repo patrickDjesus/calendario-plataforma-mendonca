@@ -1,14 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion, useReducedMotion } from 'motion/react';
-import { 
-  Play, 
-  Pause, 
-  ChevronDown,
-} from 'lucide-react';
 
 import { Task, Category } from '../types';
-import { formatSecondsToDigital } from '../utils/dateUtils';
-import { CategoryIcon } from './CategoryIcon';
 import { GifIcon, GifName } from './GifIcon';
 import { PWAInstallButton } from './PWAInstallButton';
 import { APP_NAME } from '../constants/app';
@@ -36,12 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenFullscreenFocus,
   categories,
 }) => {
-  const [isTimerExpanded, setIsTimerExpanded] = useState(false);
   const reduceMotion = useReducedMotion();
-
-  const activeCategory = activeTask
-    ? categories.find(c => c.id === activeTask.categoryId) || categories[0]
-    : null;
 
   const navItems: Array<{
     id: string;
@@ -62,14 +50,14 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-6 lg:gap-8">
           <button 
             onClick={() => onSelectTab('hoje')} 
-            className="flex items-center gap-2.5 cursor-pointer focus:outline-none group"
-            aria-label={`${APP_NAME} — ir para o início`}
+            className="flex items-center gap-2.5 cursor-pointer focus:outline-none group hover:opacity-90 transition-opacity shrink-0"
+            aria-label="Plataforma Mendonça — ir para o início"
           >
-            <span
-              className="font-extrabold text-xl sm:text-2xl tracking-tight bg-gradient-to-r from-[var(--primary)] via-indigo-500 to-violet-500 bg-clip-text text-transparent bg-gradient-to-r bg-[length:200%_100%] transition-[background-position] duration-700 group-hover:bg-[position:100%_0] [text-shadow:none]"
-            >
-              {APP_NAME}
-            </span>
+            <img 
+              src="/brand/mendonca-horizontal-claro.svg" 
+              alt="Plataforma Mendonça" 
+              className="h-9 sm:h-10 w-auto object-contain" 
+            />
           </button>
 
           {/* Desktop Navigation Links */}
@@ -104,85 +92,10 @@ export const Header: React.FC<HeaderProps> = ({
           </nav>
         </div>
 
-        {/* Right Actions: PWA Install & Active Timer */}
+        {/* Right Actions: PWA Install */}
         <div className="flex items-center gap-2 sm:gap-2.5">
-          
           {/* In-App PWA Install */}
           <PWAInstallButton variant="header" />
-
-          {/* Active Timer Dark Pill */}
-          {activeTask && (
-            <div className="relative">
-              <div 
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900 text-white shadow-md border border-slate-800 cursor-pointer ${
-                  activeTimerRunning ? 'animate-pulse-glow ring-2 ring-[var(--primary)]/40' : ''
-                }`}
-                onClick={() => setIsTimerExpanded(!isTimerExpanded)}
-              >
-                <span className={`w-2.5 h-2.5 rounded-full ${activeTimerRunning ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                <span className="text-sm font-bold tabular-nums">
-                  {formatSecondsToDigital(activeTimerElapsed)}
-                </span>
-                <span className="max-w-[120px] truncate text-xs text-slate-300 hidden sm:inline font-medium">
-                  {activeTask.title}
-                </span>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleActiveTimer();
-                  }}
-                  className="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer ml-0.5"
-                  title={activeTimerRunning ? 'Pausar (Espaço)' : 'Retomar (Espaço)'}
-                >
-                  {activeTimerRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 fill-current" />}
-                </button>
-
-                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isTimerExpanded ? 'rotate-180' : ''}`} />
-              </div>
-
-              {/* Timer Dropdown Menu */}
-              {isTimerExpanded && (
-                <div data-gif-host className="absolute right-0 mt-2 w-72 p-4 rounded-2xl bg-[var(--surface)] border border-[var(--borda)] shadow-xl z-50 animate-modal">
-                  <div className="flex items-center gap-2.5 mb-2">
-                    {activeCategory && <CategoryIcon category={activeCategory} size="sm" />}
-                    <div className="min-w-0 flex-1">
-                      <span className="text-xs font-bold uppercase text-[var(--primary)]">{activeCategory?.name}</span>
-                      <h4 className="text-sm font-bold text-[var(--texto)] truncate">{activeTask.title}</h4>
-                    </div>
-                  </div>
-
-                  <div className="text-center py-2 bg-[var(--surface-secondary)] rounded-xl my-2">
-                    <span className="text-2xl font-extrabold text-[var(--texto)] tabular-nums">
-                      {formatSecondsToDigital(activeTimerElapsed)}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 mt-3">
-                    <button
-                      onClick={onToggleActiveTimer}
-                      className="py-1.5 px-2 rounded-xl bg-[var(--primary)] text-white text-xs font-bold cursor-pointer"
-                    >
-                      {activeTimerRunning ? 'Pausar' : 'Focar'}
-                    </button>
-                    <button
-                      onClick={onOpenFullscreenFocus}
-                      className="py-1.5 px-2 rounded-xl bg-[var(--primary-soft)] text-[var(--primary)] text-xs font-bold cursor-pointer"
-                    >
-                      Tela Cheia
-                    </button>
-                    <button
-                      onClick={onStopActiveTimer}
-                      className="py-1.5 px-2 rounded-xl bg-red-500/10 text-red-600 text-xs font-bold cursor-pointer"
-                    >
-                      Zerar
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
         </div>
 
       </div>

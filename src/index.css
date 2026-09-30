@@ -11,11 +11,11 @@
     --surface-secondary: #F8FAFC;
     --sidebar: #1E1F22;
     --sidebar-surface: #2B2D31;
-    --primary: #3B6CF5;
-    --primary-hover: #2557EB;
-    --primary-soft: #EEF3FF;
-    --primary-text-on-soft: #2B57DE;
-    --primary-glow: rgba(59, 108, 245, 0.20);
+    --primary: #7C3AED;
+    --primary-hover: #6D28D9;
+    --primary-soft: #F5F3FF;
+    --primary-text-on-soft: #6D28D9;
+    --primary-glow: rgba(124, 58, 237, 0.22);
     --texto: #14161A;
     --texto-suave: #5B6473;
     --texto-muted: #6B7280;
@@ -78,6 +78,32 @@
   animation: pulseGlow 2.5s infinite ease-in-out;
 }
 
+/* Shimmer / shine glow: 4s slow glide + 5s pause = 9s cycle */
+@keyframes diagonalShimmer {
+  0% {
+    transform: translate(80%, -80%);
+    opacity: 0;
+  }
+  5% {
+    opacity: 0.9;
+  }
+  38% {
+    opacity: 0.9;
+  }
+  44% {
+    transform: translate(-80%, 80%);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-80%, 80%);
+    opacity: 0;
+  }
+}
+
+.animate-shimmer-diagonal {
+  animation: diagonalShimmer 9s cubic-bezier(0.25, 0.1, 0.25, 1) infinite;
+}
+
 /* Checkbox check animation */
 @keyframes checkDraw {
   0% {
@@ -113,7 +139,14 @@
    principal (Início, Tarefas, Semana, Jornada): header e sidebar ficam de fora
    de propósito, assim como modais, drawers e avisos flutuantes. */
 .card-hover {
-  transition-property: transform, background-color, border-color, color, box-shadow, opacity;
+  border: 1.5px solid transparent;
+  border-radius: 24px;
+  overflow: hidden;
+  background-image: linear-gradient(var(--surface), var(--surface)), linear-gradient(135deg, var(--bg), transparent);
+  background-clip: padding-box, border-box;
+  background-origin: border-box;
+  
+  transition-property: transform, background-image, border-color, color, box-shadow, opacity;
   transition-duration: 180ms;
   transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -121,6 +154,34 @@
 .card-hover:hover {
   transform: scale(1.012);
 }
+
+/* Dynamic Card Stagger Entrance on page navigation with 3D tactile physics */
+@keyframes cardPageEntrance {
+  0% {
+    opacity: 0;
+    transform: perspective(900px) rotateX(8deg) translateY(20px) scale(0.95);
+    filter: blur(5px);
+  }
+  65% {
+    transform: perspective(900px) rotateX(-1.5deg) translateY(-2px) scale(1.008);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(900px) rotateX(0deg) translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.animate-card-cascade {
+  animation: cardPageEntrance 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.stagger-1 { animation-delay: 0.03s; }
+.stagger-2 { animation-delay: 0.07s; }
+.stagger-3 { animation-delay: 0.11s; }
+.stagger-4 { animation-delay: 0.15s; }
+.stagger-5 { animation-delay: 0.19s; }
 
 /* Accessibility: prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
@@ -133,3 +194,4 @@
     scroll-behavior: auto !important;
   }
 }
+

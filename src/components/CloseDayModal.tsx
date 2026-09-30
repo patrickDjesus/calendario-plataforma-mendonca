@@ -206,7 +206,7 @@ export const CloseDayModal: React.FC<CloseDayModalProps> = ({
         {/* Action Button */}
         <button
           onClick={handleFinish}
-          className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-sm font-extrabold shadow-lg shadow-blue-500/25 transition-all cursor-pointer"
+          className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-sm font-extrabold shadow-lg shadow-violet-500/25 transition-all cursor-pointer"
         >
           <Sparkles className="w-4 h-4" />
           <span>Concluir e Fechar o Dia (+20 XP)</span>

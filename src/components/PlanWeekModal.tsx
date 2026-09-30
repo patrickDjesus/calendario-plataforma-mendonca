@@ -148,7 +148,7 @@ export const PlanWeekModal: React.FC<PlanWeekModalProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-[var(--primary-soft)] text-[var(--primary)] border border-blue-500/20">
+                    <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-[var(--primary-soft)] text-[var(--primary)] border border-violet-500/20">
                       📅 {targetDayName}
                     </span>
                     {task.estimatedMinutes && (
@@ -176,7 +176,7 @@ export const PlanWeekModal: React.FC<PlanWeekModalProps> = ({
             type="button"
             disabled={proposal.length === 0}
             onClick={handleConfirm}
-            className="px-6 py-2.5 rounded-2xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] disabled:opacity-40 text-white text-xs font-extrabold shadow-lg shadow-blue-500/25 flex items-center gap-2 cursor-pointer hover:scale-[1.02] transition-transform"
+            className="px-6 py-2.5 rounded-2xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] disabled:opacity-40 text-white text-xs font-extrabold shadow-lg shadow-violet-500/25 flex items-center gap-2 cursor-pointer hover:scale-[1.02] transition-transform"
           >
             <Check className="w-4 h-4" />
             <span>Aceitar Distribuição</span>

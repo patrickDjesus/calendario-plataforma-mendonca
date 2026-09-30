@@ -79,7 +79,7 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
       totalFocusMinutes: Math.round(totalFocusSeconds / 60),
       completedTasks,
       topCategoryName: topCategory?.name || 'Estudo Geral',
-      topCategoryColor: topCategory?.color || '#3B6CF5',
+      topCategoryColor: topCategory?.color || '#6366F1',
     };
   }, [tasks, categories, catMap]);
 
@@ -87,7 +87,7 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
     <div className="space-y-6">
       
       {/* Level Header Banner */}
-      <div data-gif-host className="card-hover rounded-[28px] bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white p-7 sm:p-8 shadow-xl shadow-blue-500/20 relative overflow-hidden">
+      <div data-gif-host className="card-hover rounded-[28px] bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-white p-7 sm:p-8 shadow-xl shadow-violet-500/20 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
@@ -101,14 +101,14 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
                 <span className="text-xs font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/20">
                   Nível {profile.level}
                 </span>
-                <span className="text-sm font-bold text-blue-200">
+                <span className="text-sm font-bold text-violet-200">
                   {levelTitle}
                 </span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-extrabold mt-1 tracking-tight">
                 {profile.xp} Pontos de Experiência
               </h2>
-              <p className="text-xs text-blue-100 mt-0.5">
+              <p className="text-xs text-violet-100 mt-0.5">
                 Desbloqueie conquistas e continue acumulando minutos de foco para subir de nível.
               </p>
             </div>
@@ -126,7 +126,7 @@ export const AchievementsView: React.FC<AchievementsViewProps> = ({
                 style={{ width: `${levelInfo.progressPercent}%` }}
               />
             </div>
-            <span className="text-[11px] text-blue-200 block text-right mt-1 font-semibold">
+            <span className="text-[11px] text-violet-200 block text-right mt-1 font-semibold">
               {levelInfo.progressPercent}% completo
             </span>
           </div>

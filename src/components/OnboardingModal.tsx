@@ -22,7 +22,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 }) => {
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
-  const [avatar, setAvatar] = useState<string>('avatar-homem');
+  const [avatar, setAvatar] = useState<string>('foguete');
   const [studyMode, setStudyMode] = useState<StudyMode>('regular');
   const [loadSampleTasks, setLoadSampleTasks] = useState(false);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([
@@ -107,35 +107,13 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               />
             </div>
 
-            <div>
-              <label className="block text-[13px] font-semibold text-[var(--texto-suave)] mb-2">
-                Escolha seu avatar
-              </label>
-              <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
-                {avatars.map((av) => (
-                  <button
-                    key={av}
-                    type="button"
-                    onClick={() => setAvatar(av)}
-                    aria-label={`Avatar ${av}`}
-                    aria-pressed={avatar === av}
-                    className={`h-14 flex items-center justify-center transition-all cursor-pointer ${
-                      avatar === av
-                        ? 'ring-2 ring-[var(--primary)] rounded-2xl scale-110'
-                        : 'opacity-70 hover:opacity-100 rounded-2xl'
-                    }`}
-                  >
-                    <GifIcon name={av} className="w-11 h-11" playOnHover />
-                  </button>
-                ))}
-              </div>
-            </div>
+
 
             <div className="pt-4 flex justify-end">
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                className="px-6 py-3 rounded-2xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-extrabold shadow-lg shadow-blue-500/25 flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
+                className="px-6 py-3 rounded-2xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-extrabold shadow-lg shadow-violet-500/25 flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
               >
                 <span>Avançar</span>
                 <ArrowRight className="w-4 h-4" />
@@ -200,7 +178,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               <button
                 type="button"
                 onClick={() => setStep(3)}
-                className="px-6 py-3 rounded-2xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-extrabold shadow-lg shadow-blue-500/25 flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
+                className="px-6 py-3 rounded-2xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-extrabold shadow-lg shadow-violet-500/25 flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
               >
                 <span>Avançar</span>
                 <ArrowRight className="w-4 h-4" />
@@ -271,7 +249,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               <button
                 type="button"
                 onClick={handleFinish}
-                className="px-7 py-3 rounded-2xl bg-gradient-to-r from-[var(--primary)] to-blue-600 text-white text-xs font-extrabold shadow-xl shadow-blue-500/25 flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
+                className="px-7 py-3 rounded-2xl bg-gradient-to-r from-[var(--primary)] to-indigo-600 text-white text-xs font-extrabold shadow-xl shadow-violet-500/25 flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>Começar Jornada!</span>

@@ -174,7 +174,7 @@ export const DailyTimeline: React.FC<DailyTimelineProps> = ({
               onDrop={(e) => handleDrop(e, hour)}
               className={`flex items-start gap-3 p-2.5 rounded-2xl transition-all border ${
                 isTarget
-                  ? 'bg-blue-50/60 border-[var(--primary)] ring-2 ring-[var(--primary)]/30'
+                  ? 'bg-violet-50/60 border-[var(--primary)] ring-2 ring-[var(--primary)]/30'
                   : hasConflict
                   ? 'bg-amber-50/50 border-amber-300 '
                   : slotTasks.length > 0

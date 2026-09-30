@@ -12,24 +12,31 @@ export interface StudyModeConfig {
 export const STUDY_MODES: Record<StudyMode, StudyModeConfig> = {
   leve: {
     name: 'Leve',
-    dailyXpGoal: 200,
-    maxDailyHours: 2.5,
+    dailyXpGoal: 150,
+    maxDailyHours: 2.0,
     description: 'Ritmo suave para manter a constância diária sem sobrecarga.',
     badge: '🌱',
   },
   regular: {
-    name: 'Regular',
-    dailyXpGoal: 400,
-    maxDailyHours: 4.5,
+    name: 'Moderado',
+    dailyXpGoal: 300,
+    maxDailyHours: 4.0,
     description: 'Equilíbrio ideal entre rendimento, teoria e resolução de questões.',
     badge: '⚡',
   },
   intenso: {
     name: 'Intenso',
-    dailyXpGoal: 600,
-    maxDailyHours: 7.0,
+    dailyXpGoal: 500,
+    maxDailyHours: 6.0,
     description: 'Maratona focada para períodos de prova, vestibulares ou concursos.',
     badge: '🔥',
+  },
+  caverna: {
+    name: 'Modo Caverna',
+    dailyXpGoal: 700,
+    maxDailyHours: 8.5,
+    description: 'Imersão absoluta e foco extremo com alto volume de entregas.',
+    badge: '🏔️',
   },
 };
 
@@ -65,8 +72,28 @@ export const LEVEL_TITLES: Record<number, string> = {
 };
 
 export function getLevelTitle(level: number): string {
-  if (level >= 25) return LEVEL_TITLES[25];
-  return LEVEL_TITLES[level] || `Mestre Nível ${level}`;
+  let rank = 'Bronze';
+  let badge = '🥉';
+  
+  if (level >= 5 && level < 10) {
+    rank = 'Prata';
+    badge = '🥈';
+  } else if (level >= 10 && level < 15) {
+    rank = 'Ouro';
+    badge = '🥇';
+  } else if (level >= 15 && level < 20) {
+    rank = 'Platina';
+    badge = '💎';
+  } else if (level >= 20 && level < 25) {
+    rank = 'Diamante';
+    badge = '👑';
+  } else if (level >= 25) {
+    rank = 'Lenda';
+    badge = '🏆';
+  }
+  
+  const baseTitle = LEVEL_TITLES[level] || LEVEL_TITLES[25] || `Mestre Nível ${level}`;
+  return `${badge} ${baseTitle} (${rank})`;
 }
 
 export function calculateLevelFromXP(totalXp: number): {
@@ -183,6 +210,64 @@ export function calculateStreak(
 
   // Streak broken
   return { streak: 1, shieldUsed: false, shieldAvailable };
+}
+
+/**
+ * Critério honesto de dia ativo:
+ * Pelo menos um destes: 1 tarefa concluída, 10 min (600s) de foco, 1 revisão concluída ou Dia Mínimo cumprido.
+ */
+export function isDayActive(data: {
+  tasksDone?: number;
+  focusSeconds?: number;
+  reviewsDone?: number;
+  minimumDayCompleted?: boolean;
+}): boolean {
+  if ((data.tasksDone || 0) >= 1) return true;
+  if ((data.focusSeconds || 0) >= 600) return true;
+  if ((data.reviewsDone || 0) >= 1) return true;
+  if (data.minimumDayCompleted) return true;
+  return false;
+}
+
+/**
+ * Calcula o número de dias ativos na semana atual (0 a 7)
+ */
+export function calculateActiveDaysThisWeek(
+  dailyStats: Record<string, { activeDay?: boolean; tasksDone?: number; focusSeconds?: number }> | undefined,
+  todayISO: string,
+  firstDayOfWeek: 0 | 1 = 1 // 1: Seg, 0: Dom
+): { activeDays: number; totalDays: number; days: Array<{ date: string; active: boolean; isToday: boolean }> } {
+  const [year, month, day] = todayISO.split('-').map(Number);
+  const current = new Date(year, month - 1, day);
+  const currentDayOfWeek = current.getDay(); // 0 = Dom, 1 = Seg ...
+
+  // Calcula início da semana
+  let diffToStart = currentDayOfWeek - firstDayOfWeek;
+  if (diffToStart < 0) diffToStart += 7;
+
+  const weekStart = new Date(year, month - 1, day - diffToStart);
+  let activeDays = 0;
+  const days: Array<{ date: string; active: boolean; isToday: boolean }> = [];
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i);
+    const yStr = d.getFullYear();
+    const mStr = String(d.getMonth() + 1).padStart(2, '0');
+    const dStr = String(d.getDate()).padStart(2, '0');
+    const iso = `${yStr}-${mStr}-${dStr}`;
+
+    const stat = dailyStats?.[iso];
+    const active = !!(stat?.activeDay || (stat?.tasksDone || 0) > 0 || (stat?.focusSeconds || 0) >= 600);
+    if (active) activeDays += 1;
+
+    days.push({
+      date: iso,
+      active,
+      isToday: iso === todayISO,
+    });
+  }
+
+  return { activeDays, totalDays: 7, days };
 }
 
 /**

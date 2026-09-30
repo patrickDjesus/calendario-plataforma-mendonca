@@ -11,32 +11,38 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
+        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'brand/*'],
         manifest: {
           id: '/',
-          name: 'FocoSemanal · Cockpit de Estudos & Produtividade',
-          short_name: 'FocoSemanal',
-          description: 'Cockpit de estudos, foco de alta precisão, planejamento semanal e gamificação por XP.',
-          theme_color: '#3B6CF5',
-          background_color: '#F3F5F9',
+          name: 'Plataforma Mendonça',
+          short_name: 'Mendonça',
+          description: 'Plataforma moderna de planejamento de estudos, foco de alta precisão e gestão de rotina.',
+          theme_color: '#0f172a',
+          background_color: '#0f172a',
           display: 'standalone',
           start_url: '/',
           scope: '/',
           icons: [
             {
-              src: '/pwa-192x192.png',
+              src: '/brand/icone-192.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-512x512.png',
+              src: '/brand/icone-192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+            {
+              src: '/brand/icone-512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any',
             },
             {
-              src: '/pwa-maskable-512x512.png',
+              src: '/brand/icone-512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable',
@@ -45,10 +51,26 @@ export default defineConfig(() => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,gif,woff,woff2}'],
-          // The illustration set is large; keep it out of the precache and
-          // serve it cache-first so a GIF is only stored once it is requested.
           globIgnores: ['**/gifs/**'],
+          ignoreURLParametersMatching: [/^r$/, /^v$/],
           runtimeCaching: [
+            {
+              urlPattern: ({ request }) => /\/brand\//.test(request.url),
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'brand-assets-cache',
+                matchOptions: {
+                  ignoreSearch: true,
+                },
+                expiration: {
+                  maxEntries: 20,
+                  maxAgeSeconds: 60 * 60 * 24 * 365,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
             {
               urlPattern: ({ request }) => request.destination === 'image' && /\/gifs\//.test(request.url),
               handler: 'CacheFirst',
@@ -103,8 +125,15 @@ export default defineConfig(() => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
+      dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom/client'],
+    },
+    optimizeDeps: {
+      include: ['react', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/client', 'motion/react', 'lucide-react'],
     },
     server: {
+      host: '0.0.0.0',
+      port: 3000,
+      allowedHosts: true as const,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},

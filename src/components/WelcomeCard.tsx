@@ -1,21 +1,18 @@
 import React from 'react';
-import { UserProfile, StudyMode } from '../types';
-import { STUDY_MODES, calculateLevelFromXP, getLevelTitle } from '../utils/xpSystem';
-import { GifIcon, StudyModeBadge } from './GifIcon';
+import { UserProfile } from '../types';
+import { calculateLevelFromXP, getLevelTitle } from '../utils/xpSystem';
+import { GifIcon } from './GifIcon';
 
 interface WelcomeCardProps {
   profile: UserProfile;
   onWhatToDoNow: () => void;
-  onChangeStudyMode: (mode: StudyMode) => void;
   todayStudiedMinutes: number;
 }
 
 export const WelcomeCard: React.FC<WelcomeCardProps> = ({
   profile,
   onWhatToDoNow,
-  onChangeStudyMode,
 }) => {
-  const currentMode = STUDY_MODES[profile.studyMode] || STUDY_MODES.regular;
   const levelInfo = calculateLevelFromXP(profile.xp);
   const levelTitle = getLevelTitle(profile.level);
 
@@ -28,11 +25,11 @@ export const WelcomeCard: React.FC<WelcomeCardProps> = ({
   });
 
   return (
-    <div data-gif-host className="card-hover w-full rounded-[24px] bg-[var(--surface)] p-5 sm:p-6 shadow-[var(--shadow-card)] relative overflow-hidden">
+    <div data-gif-host className="card-hover w-full rounded-[24px] p-5 sm:p-6 relative overflow-hidden shadow-[var(--shadow-card)]">
       {/* Leve brilho sutil no canto */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 w-full relative z-10">
         
         {/* Esquerda: Avatar + Saudação + Barra de XP */}
         <div className="flex items-center gap-4.5 sm:gap-5 min-w-0">
@@ -83,34 +80,6 @@ export const WelcomeCard: React.FC<WelcomeCardProps> = ({
               <div className="text-xs text-[var(--texto-suave)] font-medium">
                 sequência ativa
               </div>
-            </div>
-          </div>
-
-          {/* Seletor Segmentado: Modo de Estudo (altura combinada idêntica 66px) */}
-          <div className="flex flex-col justify-center px-4 py-2 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--borda)] h-[66px]">
-            <div className="flex items-center justify-between gap-3 mb-1">
-              <span className="text-xs font-bold text-[var(--texto-suave)]">Modo de estudo</span>
-              <span className="text-xs font-semibold text-[var(--primary)]">
-                <StudyModeBadge badge={currentMode.badge} className="w-5 h-5 text-[15px]" animated={false} />
-              </span>
-            </div>
-            <div className="flex items-center gap-1 bg-[var(--surface)] p-0.5 rounded-lg border border-[var(--borda)]">
-              {(['leve', 'regular', 'intenso'] as StudyMode[]).map((mode) => {
-                const isSelected = profile.studyMode === mode;
-                return (
-                  <button
-                    key={mode}
-                    onClick={() => onChangeStudyMode(mode)}
-                    className={`px-2.5 py-0.5 rounded-md text-xs font-bold capitalize transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-[var(--primary)] text-white shadow-sm'
-                        : 'text-[var(--texto-suave)] hover:text-[var(--texto)]'
-                    }`}
-                  >
-                    {mode}
-                  </button>
-                );
-              })}
             </div>
           </div>
 

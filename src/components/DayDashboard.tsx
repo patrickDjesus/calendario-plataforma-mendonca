@@ -1,9 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   ArrowRight, 
   CheckCircle2
 } from 'lucide-react';
-import { Task, Category, UserProfile, UserSettings, DailyMood } from '../types';
+import { Task, Category, UserProfile, UserSettings, DailyMood, StudyMode } from '../types';
 import { TaskCard } from './TaskCard';
 import { SmartInputBar } from './SmartInputBar';
 import { NowNextBar } from './NowNextBar';
@@ -36,7 +36,39 @@ interface DayDashboardProps {
   onSaveMood: (mood: 'otimo' | 'bom' | 'neutro' | 'cansado' | 'estressado', energy: number) => void;
   onOpenTemplates: () => void;
   onOpenFocusMode?: () => void;
+  onSelectTaskToDrawer?: (task: Task) => void;
+  onChangeStudyMode?: (mode: StudyMode) => void;
 }
+
+const IntensityBars: React.FC<{ mode: StudyMode; activeColor?: string; inactiveColor?: string }> = ({
+  mode,
+  activeColor = '#2447c9',
+  inactiveColor = '#e1ebfe'
+}) => {
+  const activeCount = mode === 'leve' ? 1 : mode === 'regular' ? 2 : 3;
+  return (
+    <svg className="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      {/* Barra 1: Pequena (Y: 10, H: 6) */}
+      <rect x="2" y="10" width="3" height="6" rx="1" fill={activeCount >= 1 ? activeColor : inactiveColor} />
+      {/* Barra 2: Média (Y: 6, H: 10) */}
+      <rect x="6.5" y="6" width="3" height="10" rx="1" fill={activeCount >= 2 ? activeColor : inactiveColor} />
+      {/* Barra 3: Grande (Y: 2, H: 14) */}
+      <rect x="11" y="2" width="3" height="14" rx="1" fill={activeCount >= 3 ? activeColor : inactiveColor} />
+    </svg>
+  );
+};
+
+const ChevronDownSvg = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);
+
+const CheckSvg = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 6 9 17l-5-5" />
+  </svg>
+);
 
 export const DayDashboard: React.FC<DayDashboardProps> = ({
   tasks,
@@ -59,9 +91,37 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
   onSelectTab,
   onSaveMood,
   onOpenFocusMode,
+  onSelectTaskToDrawer,
+  onChangeStudyMode,
 }) => {
   const [filter, setFilter] = useState<'todas' | 'pendentes' | 'concluidas'>('todas');
   const todayISO = getTodayISO();
+
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isDropdownOpen]);
 
   const studyModeConfig = STUDY_MODES[profile.studyMode] || STUDY_MODES.regular;
   const dailyXpGoal = studyModeConfig.dailyXpGoal;
@@ -107,8 +167,11 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
   const totalHoursToday = (totalSecondsToday / 3600).toFixed(1);
   const maxHours = studyModeConfig.maxDailyHours;
 
+  const [isEditingMood, setIsEditingMood] = useState(!dailyMood);
+
   const filteredTasks = useMemo(() => {
     let list = [...todayTasks];
+
     if (filter === 'pendentes') list = list.filter(t => !t.completed);
     if (filter === 'concluidas') list = list.filter(t => t.completed);
 
@@ -125,9 +188,17 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (xpPercentage / 100) * circumference;
 
+  const moodEmojis: Array<{ id: 'otimo' | 'bom' | 'neutro' | 'cansado' | 'estressado'; emoji: string; label: string }> = [
+    { id: 'otimo', emoji: '😄', label: 'Ótimo' },
+    { id: 'bom', emoji: '🙂', label: 'Bom' },
+    { id: 'neutro', emoji: '😐', label: 'Neutro' },
+    { id: 'cansado', emoji: '🥱', label: 'Cansado' },
+    { id: 'estressado', emoji: '😣', label: 'Estressado' },
+  ];
+
   return (
     <div className="space-y-6">
-      
+
       {/* Faixa AGORA / PRÓXIMO */}
       {(activeTask || recommendedTask) && (
         <NowNextBar
@@ -147,7 +218,7 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         
         {/* COLUNA 1: XP DIÁRIO (lg:col-span-4) */}
-        <div data-gif-host className="card-hover lg:col-span-4 rounded-[24px] bg-[var(--surface)] p-6 sm:p-7 shadow-[var(--shadow-card)] flex flex-col justify-between">
+        <div data-gif-host className="card-hover animate-card-cascade stagger-1 lg:col-span-4 rounded-[24px] bg-[var(--surface)] p-6 sm:p-7 shadow-[var(--shadow-card)] flex flex-col justify-between">
           <div>
             {/* Header com ícone e título */}
             <div className="flex items-center justify-between mb-4">
@@ -155,9 +226,72 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
                 <GifIcon name="experiencia-acumulada" className="w-8 h-8" />
                 <h2 className="text-lg sm:text-xl font-bold text-[var(--texto)]">XP Diário</h2>
               </div>
-              <span className="text-xs font-bold text-[var(--texto-suave)]">
-                Modo {studyModeConfig.name}
-              </span>
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded={isDropdownOpen}
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="h-11 px-[14px] rounded-[22px] bg-[#eaf0ff] border border-[#b9c8f5] text-[#2447c9] font-bold text-[15px] flex items-center gap-2 hover:opacity-90 transition-all select-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#2447c9]/50"
+                >
+                  <IntensityBars mode={profile.studyMode} />
+                  <span>{studyModeConfig.name}</span>
+                  <ChevronDownSvg />
+                </button>
+
+                {isDropdownOpen && (
+                  <div 
+                    role="listbox"
+                    aria-label="Selecionar modo de estudo"
+                    className="absolute right-0 top-full mt-2 w-[290px] bg-white border border-[#d5dcf0] rounded-[20px] p-2 shadow-[0_14px_32px_rgba(30,45,100,0.16)] z-40 animate-scaleUp"
+                  >
+                    {(['leve', 'regular', 'intenso', 'caverna'] as StudyMode[]).filter(k => STUDY_MODES[k]).map((modeKey) => {
+                      const cfg = STUDY_MODES[modeKey];
+                      const isSelected = profile.studyMode === modeKey;
+                      return (
+                        <button
+                          key={modeKey}
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={() => {
+                            if (onChangeStudyMode) {
+                              onChangeStudyMode(modeKey);
+                            }
+                            setIsDropdownOpen(false);
+                          }}
+                          className={`w-full h-12 px-3 rounded-[14px] flex items-center justify-between transition-colors cursor-pointer select-none border-0 text-left focus:outline-none ${
+                            isSelected
+                              ? 'bg-[#eaf0ff] text-[#2447c9]'
+                              : 'bg-transparent text-[#5b6478] hover:bg-slate-50 hover:text-slate-900'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <IntensityBars 
+                              mode={modeKey} 
+                              activeColor={isSelected ? '#2447c9' : '#475569'} 
+                              inactiveColor={isSelected ? '#c3dafe' : '#cbd5e1'}
+                            />
+                            <span className={`text-[15px] font-bold truncate ${isSelected ? 'text-[#2447c9]' : 'text-slate-800'}`}>
+                              {cfg.name}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`text-sm font-bold ${isSelected ? 'text-[#2447c9]' : 'text-[#5b6478]'}`}>
+                              {cfg.dailyXpGoal} XP
+                            </span>
+                            {isSelected && (
+                              <span className="text-[#2447c9]">
+                                <CheckSvg />
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Anel de 220px com trilho cinza claro #E8ECF4 e arco azul/ciano */}
@@ -259,7 +393,7 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
         </div>
 
         {/* COLUNA 2: TAREFAS DO DIA (lg:col-span-5) */}
-        <div data-gif-host className="card-hover lg:col-span-5 rounded-[24px] bg-[var(--surface)] p-6 sm:p-7 shadow-[var(--shadow-card)] flex flex-col justify-between">
+        <div data-gif-host className="card-hover animate-card-cascade stagger-2 lg:col-span-5 rounded-[24px] bg-[var(--surface)] p-6 sm:p-7 shadow-[var(--shadow-card)] flex flex-col justify-between">
           <div>
             {/* Header: Título "Tarefas do dia" + Contador + Filtros segmentados */}
             <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
@@ -322,6 +456,7 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
                       isTimerRunning={activeTimerRunning}
                       activeElapsedSeconds={activeTimerElapsed}
                       onToggleTimer={onToggleTimer}
+                      onSelectTask={onSelectTaskToDrawer}
                       onToggleComplete={onToggleComplete}
                       onEdit={onEditTask}
                       onDelete={onDeleteTask}
@@ -337,11 +472,11 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
           </div>
         </div>
 
-        {/* COLUNA 3: METAS & ENERGIA (lg:col-span-3) */}
-        <div className="lg:col-span-3 space-y-6 flex flex-col justify-between">
+        {/* COLUNA 3: METAS (lg:col-span-3) */}
+        <div className="lg:col-span-3 animate-card-cascade stagger-3">
           
           {/* Cartão METAS */}
-          <div data-gif-host className="card-hover rounded-[24px] bg-[var(--surface)] p-6 shadow-[var(--shadow-card)] flex-1">
+          <div data-gif-host className="card-hover rounded-[24px] bg-[var(--surface)] p-6 shadow-[var(--shadow-card)]">
             <div className="flex items-center gap-2 mb-5">
               <GifIcon name="metas" className="w-8 h-8" />
               <h3 className="text-lg font-bold text-[var(--texto)]">Metas</h3>
@@ -411,79 +546,45 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
             </div>
           </div>
 
-          {/* Cartão / Faixa ENERGIA */}
-          <div className="rounded-[24px] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)]">
-            <h4 className="text-sm font-bold text-[var(--texto)] mb-3 text-center sm:text-left">
-              Como está sua energia hoje?
-            </h4>
-
-            <div className="grid grid-cols-5 gap-1.5 text-center">
-              {[
-                { key: 'otimo', emoji: '🤩', label: 'Ótima', energy: 5 },
-                { key: 'bom', emoji: '😊', label: 'Boa', energy: 4 },
-                { key: 'neutro', emoji: '😐', label: 'Normal', energy: 3 },
-                { key: 'cansado', emoji: '😴', label: 'Cansada', energy: 2 },
-                { key: 'estressado', emoji: '🤯', label: 'Sem foco', energy: 1 },
-              ].map((m) => {
-                const isSelected = dailyMood?.mood === m.key;
-                return (
-                  <button
-                    key={m.key}
-                    onClick={() => onSaveMood(m.key as any, m.energy)}
-                    className={`py-2 px-1 rounded-2xl flex flex-col items-center justify-center transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-[var(--primary-soft)] ring-2 ring-[var(--primary)]'
-                        : 'hover:bg-[var(--surface-secondary)]'
-                    }`}
-                    title={m.label}
-                  >
-                    <span className="text-3xl leading-none">{m.emoji}</span>
-                    <span className="text-xs font-bold text-[var(--texto)] mt-1.5 whitespace-nowrap">
-                      {m.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
         </div>
 
       </div>
 
       {/* Linha do Tempo Interativa de Hoje */}
-      <DailyTimeline
-        tasks={tasks}
-        categories={categories}
-        activeTaskId={activeTask?.id || null}
-        activeTimerRunning={activeTimerRunning}
-        activeTimerElapsed={activeTimerElapsed}
-        onToggleTimer={onToggleTimer}
-        onEditTask={onEditTask}
-        onAssignTaskTime={async (taskId, time) => {
-          const task = tasks.find(t => t.id === taskId);
-          if (task) {
-            onAddTask({ ...task, time });
-          }
-        }}
-        onQuickNewTaskForTime={(time) => {
-          onEditTask({
-            id: '',
-            title: '',
-            categoryId: categories[0]?.id || 'cat-estudo',
-            priority: 'media',
-            date: todayISO,
-            time,
-            spentSeconds: 0,
-            completed: false,
-            tags: [],
-            subtasks: [],
-            order: 0,
-            createdAt: '',
-            updatedAt: '',
-          });
-        }}
-      />
+      <div className="animate-card-cascade stagger-4">
+        <DailyTimeline
+          tasks={tasks}
+          categories={categories}
+          activeTaskId={activeTask?.id || null}
+          activeTimerRunning={activeTimerRunning}
+          activeTimerElapsed={activeTimerElapsed}
+          onToggleTimer={onToggleTimer}
+          onEditTask={onEditTask}
+          onAssignTaskTime={async (taskId, time) => {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+              onAddTask({ ...task, time });
+            }
+          }}
+          onQuickNewTaskForTime={(time) => {
+            onEditTask({
+              id: '',
+              title: '',
+              categoryId: categories[0]?.id || 'cat-estudo',
+              priority: 'media',
+              date: todayISO,
+              time,
+              spentSeconds: 0,
+              completed: false,
+              tags: [],
+              subtasks: [],
+              order: 0,
+              createdAt: '',
+              updatedAt: '',
+            });
+          }}
+        />
+      </div>
 
     </div>
   );

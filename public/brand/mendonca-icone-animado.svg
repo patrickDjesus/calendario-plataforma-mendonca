@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="mendoncaGradAnim" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#6D28D9"/>
+    </linearGradient>
+    <style>
+      @keyframes pulseLine {
+        0%, 100% { opacity: 0.7; transform: scaleX(0.96); }
+        50% { opacity: 1; transform: scaleX(1.04); }
+      }
+      .animated-underline {
+        transform-origin: center;
+        animation: pulseLine 3s ease-in-out infinite;
+      }
+    </style>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#mendoncaGradAnim)"/>
+  <path d="M 128 340 L 128 180 L 256 312 L 384 180 L 384 340" fill="none" stroke="#FFFFFF" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+  <line class="animated-underline" x1="128" y1="392" x2="384" y2="392" stroke="#C084FC" stroke-width="28" stroke-linecap="round"/>
+</svg>

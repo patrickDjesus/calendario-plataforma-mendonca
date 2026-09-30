@@ -1,0 +1,247 @@
+================================================================================
+GUIA COMPLETO E DETALHADO DE HTML, CSS E ARQUITETURA VISUAL DO SISTEMA
+Plataforma Mendonça · Cockpit de Estudos & Produtividade (FocoSemanal v5.0)
+================================================================================
+
+Este documento detalha minuciosamente toda a estrutura HTML, as regras de CSS,
+a paleta de cores, os componentes da interface e a arquitetura de design de toda
+a plataforma.
+
+--------------------------------------------------------------------------------
+1. IDEIA GERAL E VISUALIZAÇÃO DO DESIGN (COMO O SITE FUNCIONA E SE PARECE)
+--------------------------------------------------------------------------------
+
+A "Plataforma Mendonça" é estruturada como um Cockpit de Alta Performance: um
+painel de controle moderno, limpo e direto ao ponto, projetado para eliminar
+distrações e maximizar o foco do estudante.
+
+A. CONCEITO DE VISUALIZAÇÃO ESPACIAL:
+   - Superfície Clara e Limpa: O app é inteiramente em tema claro moderno,
+     utilizando fundos suaves em cinza-azulado (#F3F5F9) e cartões brancos puros
+     (#FFFFFF) que "flutuam" através de sombras sutis (shadow-card).
+   - Sidebar Escura de Alto Contraste (#1E1F22): Uma barra lateral vertical escura
+     à esquerda que acomoda as ferramentas e atalhos rápidos. Isso cria uma
+     âncora visual sólida e separa os controles do aplicativo da área de conteúdo.
+   - Cor de Ação Única (Azul Primário - #3B6CF5): Toda ação interativa principal
+     (botões "Focar", abas ativas, botões de salvar, anéis de foco e progresso) usa
+     o azul primário.
+   - Destaques Semânticos e Matérias: As cores das matérias (Matemática, Física,
+     História, etc.) aparecem exclusivamente nos ícones/GIFs e rótulos de
+     identificação, nunca preenchendo o fundo de botões inteiros para evitar poluição.
+   - Padrão de Interação de 44px e Cantos Arredondados (rounded-xl): Todos os
+     campos de formulário, botões de ação e seletores possuem exatamente 44px de
+     altura (h-11) e bordas suavemente arredondadas (12px / 16px / 20px), garantindo
+     alvos de toque ideais tanto para desktop quanto para telas móveis.
+
+B. ESTRUTURA VISUAL DO LAYOUT (3 ZONAS):
+   ┌─────────────────────────────────────────────────────────────────────────┐
+   │ HEADER FIXO SUPERIOR (72px de altura)                                   │
+   │ Logo | Navegação por Abas (Hoje, Tarefas, Semana, Jornada) | Mini Timer  │
+   ├──────────┬──────────────────────────────────────────────────────────────┤
+   │ SIDEBAR  │ ÁREA PRINCIPAL DE CONTEÚDO (Scrollável)                      │
+   │ ESCURA   │                                                              │
+   │ (96px)   │ • Faixa "Agora / Próximo" (NowNextBar)                        │
+   │          │ • Cartão de Boas-Vindas e Modo de Estudo (WelcomeCard)        │
+   │ Novo (+) │ • Dashboard Diário / Caixa de Entrada / Semana / Conquistas  │
+   │ Foco     │ • Timeline / Cronograma de estudos                           │
+   │ Lixeira  │                                                              │
+   │ Ajustes  │                                                              │
+   └──────────┴──────────────────────────────────────────────────────────────┘
+
+--------------------------------------------------------------------------------
+2. SISTEMA CSS, VARIÁVEIS E TAILWIND CSS v4
+--------------------------------------------------------------------------------
+
+A estilização utiliza Tailwind CSS v4 importado globalmente no arquivo `/src/index.css`.
+As cores e tokens do sistema são definidos via variáveis CSS nativas no bloco `:root`:
+
+A. VARIÁVEIS CSS PRINCIPAIS (:root):
+```css
+:root {
+  color-scheme: light;
+
+  --bg: #F3F5F9;                     /* Fundo geral da aplicação */
+  --surface: #FFFFFF;                /* Superfície dos cartões e modais */
+  --surface-secondary: #F8FAFC;      /* Superfície secundária e fundos de campos */
+  --sidebar: #1E1F22;                /* Fundo da barra lateral escura */
+  --sidebar-surface: #2B2D31;        /* Superfície dos botões da sidebar */
+  --primary: #3B6CF5;                /* Azul primário das ações */
+  --primary-hover: #2557EB;          /* Azul de estado hover */
+  --primary-soft: #EEF3FF;           /* Fundo azul claro para estados ativos */
+  --primary-text-on-soft: #2B57DE;   /* Texto sobre fundo azul claro (WCAG AA) */
+  --primary-glow: rgba(59, 108, 245, 0.20); /* Brilho suave */
+  --texto: #14161A;                  /* Texto principal escuro */
+  --texto-suave: #5B6473;            /* Texto de rótulos e descrições */
+  --texto-muted: #6B7280;            /* Texto de apoio e placeholders */
+  --borda: #E2E6EF;                  /* Bordas dos cartões e inputs */
+  --borda-soft: #EEF2F7;             /* Divisores internos suaves */
+  --track-gray: #E8ECF4;             /* Trilhos inativos de barras de progresso */
+
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 24px;
+
+  --shadow-card: 0 8px 30px rgba(20, 30, 60, 0.06);
+  --shadow-subtle: 0 4px 16px rgba(20, 30, 60, 0.04);
+}
+```
+
+B. ANIMAÇÕES E CLASSES CUSTOMIZADAS NO CSS:
+- `.tabular-nums`: Força o uso de números tabulares (font-variant-numeric: tabular-nums) na fonte Plus Jakarta Sans para evitar que contadores e cronômetros balancem ao mudar os dígitos.
+- `.card-hover`: Efeito de escala suave (scale(1.012)) em 180ms com curva cubic-bezier(0.16, 1, 0.3, 1) nos cartões principais ao passar o ponteiro do mouse.
+- `@keyframes checkDraw`: Desenha a marca de seleção (check) do checkbox de forma animada.
+- `@keyframes modalScale`: Entrada animada dos modais (escala de 0.97 para 1 e elevação vertical).
+- `@keyframes pulseGlow`: Animação de pulsação brilhante no cronômetro ativo em execução.
+
+--------------------------------------------------------------------------------
+3. DETALHAMENTO DO ESTRUTURAL HTML DO INDEX E APP
+--------------------------------------------------------------------------------
+
+A. ARQUIVO BASE: `/index.html`
+- Lang e Viewport: `<html lang="pt-BR">` e `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />`.
+- Metadados SEO & PWA: `<title>`, `<meta name="description">`, `og:title`, `og:description`, `theme-color="#3B6CF5"`.
+- Fontes Google: Carregamento otimizado da fonte `Plus Jakarta Sans` nos pesos 400, 500, 600, 700 e 800 via `<link rel="preconnect">`.
+- Elemento Raiz: `<div id="root"></div>` que recebe a renderização React via `/src/main.tsx`.
+
+B. ARQUIVO RAIZ DO APP: `/src/App.tsx`
+- Gerenciador mestre de estado da aplicação (tarefas, categorias, perfil, conquistas, modelos, atalhos, modo foco e sincronicidade).
+- Layout Mestre:
+  - `<div className="min-h-screen bg-[var(--bg)] text-[var(--texto)] flex flex-col">`
+  - Contém `<Header>` fixo no topo.
+  - Subdivisão flexível: `<Sidebar>` fixo à esquerda + `<main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full">` no centro.
+  - Renderizadores condicionais de modais e overlays (`TaskModal`, `TaskDetailDrawer`, `FullscreenFocusMode`, `CommandPalette`, `SettingsModal`, `CloseDayModal`, etc.).
+
+--------------------------------------------------------------------------------
+4. DETALHAMENTO TÉCNICO DOS COMPONENTES E HTML/CSS
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+[1] CABEÇALHO SUPERIOR (Header.tsx)
+--------------------------------------------------------------------------------
+- Função: Barra de navegação mestre superior (altura 72px).
+- Estrutura HTML/Classes:
+  - `<header className="sticky top-0 z-40 bg-[var(--surface)] border-b border-[var(--borda)] shadow-subtle px-4 md:px-8 h-18 flex items-center justify-between">`
+  - Zona 1 (Logo & Marca): `<div className="flex items-center gap-3">` com ícone de foguete/marca e texto "Plataforma Mendonça".
+  - Zona 2 (Abas de Navegação): `<nav className="hidden md:flex items-center gap-1 bg-[var(--surface-secondary)] p-1 rounded-xl border border-[var(--borda)]">`
+    - Botões das abas: `Hoje`, `Tarefas`, `Semana`, `Jornada`.
+    - Classe do botão ativo: `bg-[var(--surface)] text-[var(--primary)] font-bold shadow-xs border border-[var(--borda)]`.
+    - Classe do botão inativo: `text-[var(--texto-suave)] hover:text-[var(--texto)] font-semibold`.
+  - Zona 3 (Ferramentas & Mini-Timer):
+    - Mini-Timer Flutuante no Header quando há tarefa em foco: `<div className="flex items-center gap-2 bg-[var(--sidebar)] text-white px-3 py-1.5 rounded-xl">` com tempo em tempo real (tabular-nums), botão play/pause e atalho para tela cheia.
+    - Botões de ação rápida: Busca rápida (Ctrl + K), Instalação PWA, Atalhos (?) e Configurações (engrenagem / avatar).
+
+--------------------------------------------------------------------------------
+[2] BARRA LATERAL RÁPIDA (Sidebar.tsx)
+--------------------------------------------------------------------------------
+- Função: Menu vertical esquerdo com atalhos de ferramentas operacionais.
+- Estrutura HTML/Classes:
+  - `<aside className="hidden lg:flex flex-col items-center py-6 px-3 bg-[var(--sidebar)] text-white w-24 shrink-0 justify-between">`
+  - Ações Principais:
+    - Botão "Nova Tarefa (+)" destacado: `<button className="w-12 h-12 rounded-2xl bg-[var(--primary)] text-white flex items-center justify-center hover:bg-[var(--primary-hover)] shadow-lg transition-transform hover:scale-105 cursor-pointer">`
+    - Atalhos de Ferramentas (Ícones GIF / Lucide): Foco Livre, Modo Foco em Tela Cheia, Fechar o Dia, Modelos de Rotina, Revisão Espaçada, Lixeira e Configurações.
+    - Cada item utiliza um contêiner `<div className="flex flex-col items-center gap-1 group cursor-pointer">` com tooltip e indicação visual de hover (`bg-[var(--sidebar-surface)]`).
+
+--------------------------------------------------------------------------------
+[3] CARTÃO DE BOAS-VINDAS E MODO DE ESTUDO (WelcomeCard.tsx)
+--------------------------------------------------------------------------------
+- Função: Apresentação inicial do estudante, nível de experiência (XP), streak e seletor de ritmo.
+- Estrutura HTML/Classes:
+  - `<div className="p-6 rounded-2xl bg-[var(--surface)] border border-[var(--borda)] shadow-card flex flex-col md:flex-row items-center justify-between gap-6 card-hover">`
+  - Perfil e Progresso:
+    - Avatar com insígnia de nível: `<div className="relative w-16 h-16 rounded-2xl bg-[var(--primary-soft)] flex items-center justify-center font-black text-[var(--primary)] text-xl border border-[var(--primary)]/20">`
+    - Nome do usuário, nível atual e barra de XP: `<div className="w-full h-2 bg-[var(--track-gray)] rounded-full overflow-hidden">` com preenchimento interno `bg-[var(--primary)]`.
+  - Seletor de Modo de Estudo (Ritmo):
+    - Segmented control com 3 opções: `Leve (200 XP)`, `Regular (400 XP)`, `Intenso (600 XP)`.
+    - Estilo do botão selecionado: `bg-[var(--primary-soft)] text-[var(--primary-text-on-soft)] border-[var(--primary)]/30 font-bold`.
+
+--------------------------------------------------------------------------------
+[4] FAIXA "AGORA / PRÓXIMO" (NowNextBar.tsx)
+--------------------------------------------------------------------------------
+- Função: Destaque inteligente da tarefa atual em execução ou da tarefa recomendada pelo algoritmo.
+- Estrutura HTML/Classes:
+  - `<div className="p-4 rounded-2xl bg-gradient-to-r from-[var(--surface)] to-[var(--surface-secondary)] border border-[var(--borda)] shadow-subtle flex items-center justify-between gap-4">`
+  - Estado 1 (Em Foco Ativo): Badge "EM FOCO AGORA" + título da tarefa + cronômetro rodando + botões de Pausar e Concluir.
+  - Estado 2 (Recomendação Ociosa): Badge "PRÓXIMO RECOMENDADO" + sugestão da tarefa de maior prioridade + botão de 1 clique "Iniciar Foco".
+
+--------------------------------------------------------------------------------
+[5] DASHBOARD DIÁRIO (DayDashboard.tsx)
+--------------------------------------------------------------------------------
+- Função: Painel central da visão "Hoje" dividido em 3 colunas responsivas (`grid grid-cols-1 lg:grid-cols-12 gap-6`).
+- Estrutura HTML/Classes:
+  - Coluna 1 (XP e Meta Diária - 3 cols):
+    - Anel SVG circular de 220px (`<svg className="w-48 h-48 transform -rotate-90">`) com `strokeDasharray` e `strokeDashoffset` calculados dinamicamente para mostrar a porcentagem de XP concluído no dia.
+  - Coluna 2 (Entrada Inteligente & Lista do Dia - 6 cols):
+    - Entrada NLP (`SmartInputBar.tsx`): `<div className="relative flex items-center">` com input para digitar prompts como *"Física amanhã 14:00 45m #enem !alta"*.
+    - Filtros por status: Botões de alternância `Todas`, `Pendentes`, `Concluídas`.
+    - Cartões de Tarefa (`TaskCard.tsx`): `<div className="p-4 rounded-xl bg-[var(--surface)] border border-[var(--borda)] flex items-center justify-between group hover:border-[var(--primary)]/50 transition-all">`.
+  - Coluna 3 (Métricas & Humor - 3 cols):
+    - Barras de progresso para Tarefas Concluídas, Horas Focadas e Top 3 do dia.
+    - Seletor de Humor: 5 botões de humor (`😄 Ótima`, `🙂 Boa`, `😐 Normal`, `😫 Cansado`, `😞 Difícil`) estilizados em grid.
+
+--------------------------------------------------------------------------------
+[6] GAVETA LATERAL DE DETALHES DA TAREFA (TaskDetailDrawer.tsx - REFATORADO)
+--------------------------------------------------------------------------------
+- Função: Painel lateral deslizante completo para visualização, edição avançada e gestão de subtarefas, anexos e histórico.
+- Estrutura HTML/Classes:
+  - Container de Overlay: `<div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex justify-end animate-fadeIn">`
+  - Painel da Gaveta: `<div className="w-full sm:w-[500px] md:w-[540px] lg:w-[580px] bg-[var(--surface)] text-[var(--texto)] h-full shadow-2xl border-l border-[var(--borda)] flex flex-col justify-between overflow-hidden animate-slideLeft">`
+  - Cabeçalho Fixo da Gaveta:
+    - Esquerda: Botão "Concluída / Marcar como feita" + Botão "Focar" em azul primário.
+    - Direita: Botão de Lixeira com confirmação suave (*"Excluir? Sim / Não"*) + Botão Fechar (X) agrupados em alvos de clique de 36x36px (`w-9 h-9 rounded-xl hover:bg-[var(--surface-secondary)]`).
+  - Navegação de Abas Internas:
+    - Sub-abas: `Visão Geral`, `Treino & Saúde` / `Conteúdo & Tópicos`, `Links & Anexos`, `Atividade`.
+  - Formulário e Controles Customizados (Visão Geral):
+    - Edição inline do Título da Tarefa.
+    - Seletor de Matéria / Categoria (Custom Popover): Botão/chip de 44px (`h-11 rounded-xl w-full px-3.5 bg-[var(--surface)] border border-[var(--borda)] hover:border-[var(--primary)]`). Exibe o `CategoryIcon` / GIF e o nome da matéria. Ao clicar, abre um popover ancorado no campo com a lista de matérias em chips sem truncar o texto.
+    - Seletor de Prioridade (Custom Popover): Botão/chip de 44px (`h-11 rounded-xl`) com indicador de ponto colorido (verde/baixa, âmbar/média, vermelho/alta, roxo/urgente). Sem seta padrão do navegador.
+    - Data & Tempo Estimado: Inputs de 44px com ícones nativos + atalhos de duração de 1 clique (`15m`, `30m`, `45m`, `60m`).
+    - Toggles "Top 3 do dia" e "Fixar no topo": Botões com `role="switch"` e `aria-checked`. Estado ativo com fundo suave em azul (`primary-soft`) e o ícone (estrela/pin) mantendo sua cor de destaque sem preencher o botão inteiro.
+    - Descrição e Anotações: Textarea com auto-grow (cresce com o texto, de 2 linhas até 220px com rolagem).
+    - Subtarefas / Checklist: Input para adicionar subtarefas, barra de progresso em porcentagem e lista com marcas de seleção.
+    - Rótulos em Sentence Case: Todos os textos em estilo frase (*"Matéria / categoria"*, *"Prioridade"*, *"Data"*, *"Tempo estimado (min)"*, *"Descrição e anotações"*, *"Subtarefas / checklist"*, *"Tags"*) com cor `--texto-suave` e 13px.
+
+--------------------------------------------------------------------------------
+[7] MODAL DE NOVA TAREFA E EDIÇÃO (TaskModal.tsx)
+--------------------------------------------------------------------------------
+- Função: Modal centralizado para rápida criação de tarefas.
+- Estrutura HTML/Classes:
+  - `<div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">`
+  - Caixa do Modal: `<div className="w-full max-w-[620px] bg-[var(--surface)] border border-[var(--borda)] shadow-2xl rounded-[24px] flex flex-col max-h-[88vh] animate-modal overflow-hidden">`
+  - Cabeçalho Fixo com Título e Descrição de apoio.
+  - Seleção Visual de Matéria em Grid de Chips com Ilustrações / GIFs.
+  - Grade de Imagens e Prioridades (Baixa, Média, Alta, Urgente).
+  - Linha de Data, Horário e Duração com atalhos numéricos tabulares.
+  - Validação inline e dica de atalho de teclado `Ctrl + Enter`.
+
+--------------------------------------------------------------------------------
+[8] MODO FOCO EM TELA CHEIA (FullscreenFocusMode.tsx)
+--------------------------------------------------------------------------------
+- Função: Interface imersiva de foco absoluto sem distrações.
+- Estrutura HTML/Classes:
+  - `<div className="fixed inset-0 z-50 bg-[#0E1117] text-white flex flex-col justify-between p-6 sm:p-10 animate-fadeIn">`
+  - Cronômetro Gigante Centralizado: `<div className="text-7xl sm:text-9xl font-black tabular-nums tracking-tight text-white drop-shadow-lg">`
+  - Seletor de Modo: Alternância entre Pomodoro (25m / 5m) e Foco Livre.
+  - Sintetizador de Som Ambiente: Botões para ativar sons relaxantes (Chuva suave, Ruído branco, Café, Floresta) via Web Audio API.
+  - Mudar para Janela Flutuante (Document Picture-in-Picture).
+
+--------------------------------------------------------------------------------
+5. REGRAS DE ACESSIBILIDADE E RESPONSIVIDADE
+--------------------------------------------------------------------------------
+
+A. CONTRASTE E TIPOGRAFIA (WCAG AA):
+   - Mínimo de 4.5:1 em todos os textos de interface (`--texto`: #14161A, `--texto-suave`: #5B6473).
+   - Fonte Plus Jakarta Sans com números tabulares (`font-variant-numeric: tabular-nums`) em todos os dígitos de horários e metas.
+
+B. NAVEGAÇÃO POR TECLADO & FOCO VISÍVEL:
+   - Anéis de foco azul de 2px (`focus:outline-none focus:ring-2 focus:ring-[var(--primary)]`) ativados via teclado em todos os botões e formulários.
+   - Suporte a teclas globais (`N` para nova tarefa, `F` para modo foco, `Ctrl+K` para busca, `Esc` para fechar modais).
+   - Focus Trap ativado dentro de modais para manter a navegação contida.
+
+C. BREAKPOINTS RESPONSIVOS:
+   - Móvel (< 640px / 375px): Layout em coluna única, botões e controles ocupando 100% da largura, gaveta ocupando a tela inteira.
+   - Tablet (768px): Grid de 2 colunas, gaveta lateral com largura de 500px.
+   - Desktop (1440px): Cockpit completo com Sidebar fixa de 96px, Header de 72px, Grid de 3 colunas e gaveta de 580px.
+
+================================================================================
+Plataforma Mendonça · Documentação técnica detalhada mantida e sincronizada.
+================================================================================

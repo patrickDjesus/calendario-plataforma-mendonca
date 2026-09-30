@@ -156,13 +156,16 @@ class CloudSync {
       const target = this.requireUser();
       this.setStatus('syncing');
       const nextRev = this.rev + 1;
+      const nowISO = new Date().toISOString();
+      const todayDate = nowISO.split('T')[0];
+
       const { error } = await this.client.from('app_state').upsert(
         {
           user_id: target,
           data: db,
           rev: nextRev,
           version: db.version,
-          updated_at: new Date().toISOString(),
+          updated_at: nowISO,
         },
         { onConflict: 'user_id' }
       );
@@ -170,6 +173,9 @@ class CloudSync {
       this.rev = nextRev;
       this.pending = null;
       this.setStatus('synced');
+
+      // Bloco A3: Backup diário automático no primeiro sync do dia
+      this.maybeCreateDailyBackup(target, todayDate, db).catch(() => {});
     });
     this.pushChain = job.catch(() => {});
     return job.catch((err) => {
@@ -177,6 +183,103 @@ class CloudSync {
       this.setStatus('error');
       throw err;
     });
+  }
+
+  /**
+   * Tenta salvar backup diário na tabela app_state_backups se disponível
+   */
+  private async maybeCreateDailyBackup(userId: string, todayDate: string, db: DatabaseSchema): Promise<void> {
+    const lastBackupKey = `lumina_last_daily_backup_${userId}`;
+    const lastBackupDate = typeof localStorage !== 'undefined' ? localStorage.getItem(lastBackupKey) : null;
+    if (lastBackupDate === todayDate) return;
+
+    try {
+      await this.client.from('app_state_backups').insert({
+        user_id: userId,
+        snapshot_date: todayDate,
+        data: db,
+        created_at: new Date().toISOString(),
+      });
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(lastBackupKey, todayDate);
+      }
+    } catch {
+      // Degradação elegante caso a tabela não tenha sido criada no Supabase ainda
+    }
+  }
+
+  /** Busca lista de backups remotos se disponível */
+  async fetchBackups(): Promise<Array<{ id: string; snapshot_date: string; created_at: string; data_size: number }>> {
+    try {
+      const target = this.requireUser();
+      const { data, error } = await this.client
+        .from('app_state_backups')
+        .select('id, snapshot_date, created_at, data')
+        .eq('user_id', target)
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (error || !data) return [];
+      return data.map((row: any) => ({
+        id: row.id,
+        snapshot_date: row.snapshot_date,
+        created_at: row.created_at,
+        data_size: JSON.stringify(row.data || {}).length,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  /** Restaura backup específico da tabela de backups */
+  async fetchBackupById(backupId: string): Promise<DatabaseSchema | null> {
+    try {
+      const { data, error } = await this.client
+        .from('app_state_backups')
+        .select('data')
+        .eq('id', backupId)
+        .maybeSingle();
+      if (error || !data) return null;
+      return data.data as DatabaseSchema;
+    } catch {
+      return null;
+    }
+  }
+
+  // ==== BLOCO A7: SUPABASE AUTH ====
+  async sendMagicLink(email: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await this.client.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+        },
+      });
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Falha ao enviar link mágico' };
+    }
+  }
+
+  async signOut(): Promise<void> {
+    try {
+      await this.client.auth.signOut();
+    } catch {}
+  }
+
+  async getAuthSessionUser(): Promise<{ id: string; email?: string } | null> {
+    try {
+      const { data } = await this.client.auth.getSession();
+      if (data?.session?.user) {
+        return {
+          id: data.session.user.id,
+          email: data.session.user.email,
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 
   /** Reenvia o ultimo snapshot que falhou, se houver. */

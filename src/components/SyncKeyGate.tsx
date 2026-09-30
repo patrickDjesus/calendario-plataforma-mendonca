@@ -75,7 +75,7 @@ export const SyncKeyGate: React.FC<SyncKeyGateProps> = ({ onConnect }) => {
     <div className="min-h-screen bg-[var(--bg)] flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-[var(--surface)] rounded-3xl border border-[var(--borda)] shadow-xl p-6 sm:p-8">
         <div className="flex items-center gap-3 mb-1">
-          <div className="w-11 h-11 rounded-2xl bg-[var(--primary)] flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+          <div className="w-11 h-11 rounded-2xl bg-[var(--primary)] flex items-center justify-center text-white shadow-lg shadow-violet-500/30">
             <KeyRound size={22} strokeWidth={2.5} />
           </div>
           <div>

@@ -226,7 +226,7 @@ export const WeekStrip: React.FC<WeekStripProps> = ({
 
         {/* Next Month Transition Card */}
         <div className="w-[200px] shrink-0 rounded-2xl border border-dashed border-[var(--primary)]/40 bg-[var(--primary-soft)]/10 hover:bg-[var(--primary-soft)]/20 flex flex-col items-center justify-center p-6 gap-3 transition-all snap-start text-center my-auto self-stretch min-h-[480px]">
-          <div className="w-12 h-12 rounded-2xl bg-[var(--primary)] text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+          <div className="w-12 h-12 rounded-2xl bg-[var(--primary)] text-white flex items-center justify-center shadow-md shadow-violet-500/20">
             <Calendar className="w-6 h-6" />
           </div>
           <div>

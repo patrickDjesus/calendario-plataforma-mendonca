@@ -426,7 +426,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-semibold text-[var(--texto-suave)]">
-                  Data, horário e duração
+                  {recurringDays.length > 0 ? 'Data de início, horário e duração' : 'Data, horário e duração'}
                 </label>
                 {/* Quick duration shortcuts */}
                 <div className="flex items-center gap-1 text-[11px] text-[var(--texto-muted)]">
@@ -456,9 +456,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    aria-label="Data da tarefa"
+                    aria-label={recurringDays.length > 0 ? "Data de início" : "Data da tarefa"}
                     className="w-full h-11 pl-9 pr-3 rounded-xl bg-[var(--surface-secondary)] border border-[var(--borda)] text-xs font-semibold text-[var(--texto)] tabular-nums focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-all"
                   />
+                  <div className="absolute top-full left-0 mt-1 text-[10px] text-[var(--texto-muted)] font-medium leading-none">
+                    {recurringDays.length > 0 ? 'Rotina começa a partir deste dia' : 'Dia em que a tarefa será executada'}
+                  </div>
                 </div>
 
                 {/* Time */}
@@ -598,6 +601,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                         );
                       })}
                     </div>
+                    {recurringDays.length > 0 && (
+                      <p className="text-[10px] sm:text-[11px] text-[var(--primary)] font-bold mt-2 flex items-center gap-1.5 leading-tight animate-fadeIn">
+                        <span>🔄</span>
+                        <span>Esta tarefa é uma rotina recorrente! Ela aparecerá automaticamente nos dias selecionados (a partir da data de início definida acima).</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Subtasks */}

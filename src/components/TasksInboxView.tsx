@@ -598,7 +598,9 @@ export const TasksInboxView: React.FC<TasksInboxViewProps> = ({
 
                                 {/* Priority Pill */}
                                 <span className={`text-xs font-bold px-2.5 py-1 rounded-lg capitalize ${
-                                  task.priority === 'alta'
+                                  task.priority === 'urgente'
+                                    ? 'bg-red-500/10 text-red-700 border border-red-500/30 font-extrabold'
+                                    : task.priority === 'alta'
                                     ? 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
                                     : task.priority === 'media'
                                     ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20'

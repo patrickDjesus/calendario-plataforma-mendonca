@@ -178,6 +178,7 @@ export const GifIcon: React.FC<GifIconProps> = ({
   const boxRef = useRef<HTMLSpanElement>(null);
   const touchTimer = useRef<number | null>(null);
   const finishTimer = useRef<number | null>(null);
+  const hoverCycleTimer = useRef<number | null>(null);
   /** Instante em que o GIF atual comecou a tocar (ancorado no load da img). */
   const cycleStart = useRef(0);
   /** O GIF esta montado e rodando (pode estar segurando o fim do ciclo). */
@@ -203,6 +204,13 @@ export const GifIcon: React.FC<GifIconProps> = ({
     }
   }, []);
 
+  const clearHoverCycleTimer = useCallback(() => {
+    if (hoverCycleTimer.current !== null) {
+      window.clearTimeout(hoverCycleTimer.current);
+      hoverCycleTimer.current = null;
+    }
+  }, []);
+
   const stopTouchTimer = useCallback(() => {
     if (touchTimer.current !== null) {
       window.clearTimeout(touchTimer.current);
@@ -213,17 +221,19 @@ export const GifIcon: React.FC<GifIconProps> = ({
   /** Monta o GIF; o ciclo comeca a ser cronometrado no load da imagem. */
   const play = useCallback(() => {
     clearFinishTimer();
+    clearHoverCycleTimer();
     pendingStop.current = false;
     showGif(true);
-  }, [clearFinishTimer, showGif]);
+  }, [clearFinishTimer, clearHoverCycleTimer, showGif]);
 
   /** Corta a animacao na hora, ignorando o fim do ciclo. */
   const stop = useCallback(() => {
     clearFinishTimer();
+    clearHoverCycleTimer();
     pendingStop.current = false;
     playing.current = false;
     showGif(false);
-  }, [clearFinishTimer, showGif]);
+  }, [clearFinishTimer, clearHoverCycleTimer, showGif]);
 
   /**
    * Ao sair do hospedeiro o GIF continua rodando e so volta ao frame estatico
@@ -237,6 +247,7 @@ export const GifIcon: React.FC<GifIconProps> = ({
    */
   const finishCycle = useCallback(() => {
     if (!activeRef.current) return;
+    clearHoverCycleTimer();
     if (!playing.current) {
       // O GIF ainda esta decodificando: o load ancora o ciclo e corta dali.
       pendingStop.current = true;
@@ -251,7 +262,7 @@ export const GifIcon: React.FC<GifIconProps> = ({
       playing.current = false;
       showGif(false);
     }, loop - phase + LOOP_TAIL_MS);
-  }, [clearFinishTimer, showGif, name]);
+  }, [clearFinishTimer, clearHoverCycleTimer, showGif, name]);
 
   /**
    * Ancora o ciclo no load (e nao no setState): o navegador ainda tem que
@@ -268,9 +279,17 @@ export const GifIcon: React.FC<GifIconProps> = ({
       if (pendingStop.current) {
         pendingStop.current = false;
         finishCycle();
+      } else if (name !== 'fogo-sequencia') {
+        // Agora que a imagem de fato carregou fisicamente na tela, iniciamos o timer de 1 ciclo!
+        clearHoverCycleTimer();
+        const duration = LOOP_MS[name] ?? 2000;
+        hoverCycleTimer.current = window.setTimeout(() => {
+          hoverCycleTimer.current = null;
+          showGif(false);
+        }, duration);
       }
     },
-    [isStatic, playOnHover, animated, finishCycle]
+    [isStatic, playOnHover, animated, finishCycle, name, clearHoverCycleTimer, showGif]
   );
 
   // Pré-carrega o GIF enquanto o navegador está ocioso: evita o "piscar" no
@@ -334,10 +353,11 @@ export const GifIcon: React.FC<GifIconProps> = ({
       host.removeEventListener('pointerdown', handlePointerDown);
       stopTouchTimer();
       clearFinishTimer();
+      clearHoverCycleTimer();
       playing.current = false;
       pendingStop.current = false;
     };
-  }, [playOnHover, isStatic, name, play, stop, finishCycle, stopTouchTimer, clearFinishTimer]);
+  }, [playOnHover, isStatic, name, play, stop, finishCycle, stopTouchTimer, clearFinishTimer, clearHoverCycleTimer]);
 
   const src = !playOnHover || isStatic || active ? animated : still;
   const useBlend = blend ?? Boolean(WHITE_BACKDROP[name]);
