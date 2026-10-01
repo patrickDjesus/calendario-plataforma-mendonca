@@ -219,17 +219,30 @@ export function buildInitialDailyStats(db: any): Record<string, DailyStat> {
     });
   }
 
-  // 3. Sessões de foco
-  if (Array.isArray(db.focusSessions)) {
-    db.focusSessions.forEach((s: FocusSession) => {
-      if (s.startedAt) {
-        const d = s.startedAt.split('T')[0];
-        const entry = ensureDate(d);
-        entry.focusSeconds += s.actualSeconds || 0;
-        if (s.actualSeconds >= 600) entry.activeDay = true; // >= 10 min
-      }
-    });
-  }
+  // 3. Tempo de foco: o que o cronometro mediu e gravou nas tarefas.
+  //    A FocusSession e o REGISTRO de quando a sessao foi encerrada, e os
+  //    segundos dela ja estao dentro de `spentSeconds` — somar os dois aqui
+  //    contaria o mesmo tempo duas vezes. Por isso `focusSessions` nao entra
+  //    nesta reconstrucao.
+  const addFocus = (date: string | undefined, seconds: number | undefined) => {
+    if (!date || !seconds || seconds <= 0) return;
+    const entry = ensureDate(date);
+    entry.focusSeconds += seconds;
+    if (entry.focusSeconds >= 600) entry.activeDay = true;
+  };
+
+  allTasks.forEach((t: any) => {
+    if (t.deletedAt) return;
+    // Serie recorrente: o tempo foi divided por dia, e o total da ancora nao
+    // pode ser somado de novo.
+    if (Array.isArray(t.recurringDays) && t.recurringDays.length > 0) {
+      Object.entries(t.spentSecondsByDay || {}).forEach(([date, seconds]) => {
+        addFocus(date, Number(seconds) || 0);
+      });
+      return;
+    }
+    addFocus(t.date, t.spentSeconds);
+  });
 
   // 4. Humor diário
   if (db.dailyMoods) {

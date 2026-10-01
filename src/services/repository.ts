@@ -58,6 +58,7 @@ import {
 import { calculateSM2 } from '../utils/xpSystem';
 import { applyMigrations, buildInitialDailyStats, CURRENT_SCHEMA_VERSION } from './migrations';
 import { mergeSnapshots } from './syncConflict';
+import { spentSecondsOn, withOccurrenceSpent } from './recurrence';
 import { calculateNextReview, ReviewGrade } from '../utils/sm2';
 
 export const DEFAULT_CATEGORIES: Category[] = [
@@ -288,6 +289,28 @@ function getTodayString(): string {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Soma tempo de foco no agregado do dia. Este e o unico lugar que escreve
+ * `focusSeconds`: o tempo ja foi medido pelo timer, entao quem soma aqui e a
+ * propria medicao. Gravar de novo na hora de fechar a sessao contava o mesmo
+ * segundo duas vezes.
+ */
+function addDailyFocusSeconds(db: DatabaseSchema, iso: string, seconds: number): void {
+  if (!db.dailyStats) db.dailyStats = {};
+  if (!db.dailyStats[iso]) {
+    db.dailyStats[iso] = {
+      date: iso,
+      tasksDone: 0,
+      xp: 0,
+      focusSeconds: 0,
+      activeDay: false,
+    };
+  }
+  const stat = db.dailyStats[iso];
+  stat.focusSeconds += seconds;
+  if (stat.focusSeconds >= 600) stat.activeDay = true;
 }
 
 /**
@@ -846,6 +869,35 @@ class DataRepository {
     db.tasks.push(newTask);
     await this.persist(db);
     return newTask;
+  }
+
+  /**
+   * Grava tempo de foco em UMA escrita: soma na tarefa (ou na ocorrencia da
+   * serie, quando `iso` nao e a data da ancora) e no agregado do dia.
+   *
+   * O timer chama isto a cada 10s. Fazer a tarefa e o agregado em dois
+   * `persist` dobraria o numero de pushes para a nuvem a cada gravacao, e
+   * `spentSeconds` na licao de casa mais o tempo do bloco corrente viraria
+   * contagem dupla na hora de fechar a sessao.
+   *
+   * Le do banco em memoria de proposito: e o que garante que dois flushes
+   * seguidos nao sobrescrevam um ao outro com um `spentSeconds` defasado.
+   */
+  public async addFocusSeconds(taskId: string, iso: string, seconds: number): Promise<Task | null> {
+    if (!taskId || !iso || seconds <= 0) return null;
+    const db = await this.initialize();
+    const index = db.tasks.findIndex(t => t.id === taskId && !t.deletedAt);
+    if (index < 0) return null;
+
+    const current = db.tasks[index];
+    const updated = withOccurrenceSpent(current, iso, spentSecondsOn(current, iso) + seconds);
+    updated.updatedAt = new Date().toISOString();
+    db.tasks[index] = updated;
+
+    addDailyFocusSeconds(db, iso, seconds);
+
+    await this.persist(db);
+    return updated;
   }
 
   public async saveTasksBatch(tasks: Task[]): Promise<void> {
@@ -1423,6 +1475,12 @@ class DataRepository {
     return db.focusSessions || [];
   }
 
+  /**
+   * A FocusSession e o REGISTRO da sessao (quando, quanto, com que nota).
+   * O tempo em si ja foi medido e gravado por `addFocusSeconds` enquanto o
+   * cronometro rodava — somar `actualSeconds` aqui de novo inflava as horas do
+   * dia em quase 2x para toda sessao fechada pelo botao "Concluir".
+   */
   public async saveFocusSession(session: FocusSession): Promise<FocusSession> {
     const db = await this.initialize();
     if (!db.focusSessions) db.focusSessions = [];
@@ -1431,32 +1489,6 @@ class DataRepository {
       db.focusSessions[idx] = session;
     } else {
       db.focusSessions.push(session);
-    }
-
-    // Atualiza spentSeconds na tarefa se vinculada
-    if (session.taskId) {
-      const task = db.tasks.find(t => t.id === session.taskId);
-      if (task) {
-        task.spentSeconds = (task.spentSeconds || 0) + session.actualSeconds;
-        task.updatedAt = new Date().toISOString();
-      }
-    }
-
-    // Atualiza dailyStats
-    const date = session.startedAt.split('T')[0];
-    if (!db.dailyStats) db.dailyStats = {};
-    if (!db.dailyStats[date]) {
-      db.dailyStats[date] = {
-        date,
-        tasksDone: 0,
-        xp: 0,
-        focusSeconds: 0,
-        activeDay: false,
-      };
-    }
-    db.dailyStats[date].focusSeconds += session.actualSeconds;
-    if (session.actualSeconds >= 600) {
-      db.dailyStats[date].activeDay = true;
     }
 
     await this.persist(db);

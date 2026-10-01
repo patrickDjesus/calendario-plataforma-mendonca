@@ -28,7 +28,7 @@ interface FullscreenFocusModeProps {
   activeTimerRunning: boolean;
   activeTimerElapsed: number;
   onToggleTimer: () => void;
-  onCompleteTask: (task: Task, reflectionNote?: string, enableSpacedRepetition?: boolean) => void;
+  onCompleteTask: (task: Task, reflectionNote?: string, enableSpacedRepetition?: boolean) => void | Promise<void>;
   category?: Category;
   phaseTargetSeconds?: number;
   phaseLabel?: string;
@@ -83,21 +83,26 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
 
   if (!isOpen || !activeTask) return null;
 
-  // O anel mede o BLOCO do Pomodoro quando ha fase em curso, e cai para a
-  // estimativa da tarefa quando o bloco termina e sobra tempo de trabalho.
-  const blockSeconds = phaseTargetSeconds || 0;
-  const fallbackSeconds = (activeTask.estimatedMinutes || 45) * 60;
-  const usaBloco = blockSeconds > 0 && activeTimerElapsed <= blockSeconds;
-  const alvo = usaBloco ? blockSeconds : fallbackSeconds;
-  const referencia = usaBloco ? activeTimerElapsed : Math.max(activeTimerElapsed - blockSeconds, 0);
-  const progressPercent = alvo > 0
-    ? Math.min(100, Math.round((referencia / alvo) * 100))
+  // Dois relogios diferentes, e eles nao podem se misturar:
+  //
+  //  - O ANEL mede a FASE em curso (bloco de 25 min ou pausa). O contador zera a
+  //    cada virada de fase, entao ele nunca passa do alvo da fase.
+  //  - A META e da TAREFA: o tempo ja gasto nela contra a estimativa.
+  //
+  //  Antes o anel exibia "Meta: 1h30 (43%)" com o percentual do BLOCO embaixo
+  //  da meta da tarefa, e quem estudava 1h10 lia 43% como 43% de 1h30.
+  const phaseSeconds = phaseTargetSeconds || 25 * 60;
+  const phasePercent = Math.min(100, Math.round((activeTimerElapsed / phaseSeconds) * 100));
+
+  const metaSeconds = (activeTask.estimatedMinutes || 0) * 60;
+  const metaPercent = metaSeconds > 0
+    ? Math.min(100, Math.round(((activeTask.spentSeconds || 0) / metaSeconds) * 100))
     : 0;
 
   // Big SVG Ring Math
   const radius = 130;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
+  const strokeDashoffset = circumference - (phasePercent / 100) * circumference;
 
   const handleSaveDistraction = async () => {
     if (!distractionText.trim()) return;
@@ -140,7 +145,10 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
       examMode,
     });
 
-    onCompleteTask(activeTask, reflectionNote, enableSpacedRep);
+    // Espera concluir: `onClose` dispara um flush do tempo pendente, e se ele rodar
+    // antes de a conclusao zerar os refs, os mesmos segundos iriam para a tarefa
+    // duas vezes.
+    await onCompleteTask(activeTask, reflectionNote, enableSpacedRep);
     setShowReflectionModal(false);
     onClose();
   };
@@ -267,11 +275,18 @@ export const FullscreenFocusMode: React.FC<FullscreenFocusModeProps> = ({
                 </span>
               </div>
 
-              {activeTask.estimatedMinutes && (
-                <span className="text-xs text-slate-500 mt-1 font-medium">
-                  Meta: {formatMinutesHuman(activeTask.estimatedMinutes)} ({progressPercent}%)
+              <div className="mt-2 text-center">
+                <span className="block text-xs text-slate-500 font-semibold">
+                  {pomodoroPhase === 'foco'
+                    ? `Bloco ${completedFocusBlocks + 1} · ${phasePercent}% do bloco`
+                    : `${phaseLabel || 'Pausa'} · ${phasePercent}% da pausa`}
                 </span>
-              )}
+                {activeTask.estimatedMinutes ? (
+                  <span className="block text-xs text-slate-500 font-medium">
+                    Meta da tarefa: {formatMinutesHuman(activeTask.estimatedMinutes)} · {metaPercent}%
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
 

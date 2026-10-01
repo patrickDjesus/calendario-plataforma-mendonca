@@ -582,11 +582,11 @@ export default function App() {
     const ref = resolveTaskRef(taskOrId);
     if (!ref) return null;
 
-    // Busca a versao mais recente direto do banco em memoria para nao sofrer de stale closure
-    const freshBaseTask = (await repository.getTaskById(ref.original.id)) || ref.original;
-    const jaTem = spentSecondsOn(freshBaseTask, ref.iso);
-    const updated = withOccurrenceSpent(freshBaseTask, ref.iso, jaTem + extraSec);
-    const saved = await repository.saveTask(updated);
+    // Uma unica escrita: tarefa + agregado do dia. Ler do banco dentro do
+    // repositorio evita o stale closure que fazia dois flushes seguidos
+    // sobrescrevrem o `spentSeconds` um do outro.
+    const saved = await repository.addFocusSeconds(ref.original.id, ref.iso, extraSec);
+    if (!saved) return null;
 
     // Sincroniza estado de tarefas imediatamente
     setTasks(prev => prev.map(t => t.id === saved.id ? saved : t));
@@ -897,8 +897,15 @@ export default function App() {
     const freshTask = (ref ? await repository.getTaskById(ref.original.id) : (task.id ? await repository.getTaskById(task.id) : null)) || (ref ? ref.original : task);
     const baseTask = ref ? freshTask : task;
 
+    // A tarefa-base e a ancora da comparacao: uma ocorrencia (`serie#dia`) e a
+    // propria serie que esta em foco.
+    const activeRef = activeTaskId ? resolveTaskRef(activeTaskId) : null;
+    const activeBaseId = activeRef ? activeRef.original.id : (activeTaskId || null);
+    const targetBaseId = ref ? ref.original.id : (task.id || null);
+    const isActiveTarget = !!targetBaseId && activeBaseId === targetBaseId;
+
     let finalSpent = ref ? spentSecondsOn(freshTask, ref.iso) : (freshTask.spentSeconds || 0);
-    if (activeTaskId === baseTask.id && activeTimerRunning) {
+    if (isActiveTarget && activeTimerRunning) {
       if (pomodoroPhase === 'foco') {
         const vivo = segmentStartRef.current ? Math.floor((Date.now() - segmentStartRef.current) / 1000) : 0;
         setAccumulatedTimerSeconds(accumulatedTimerSeconds + vivo);
@@ -913,11 +920,24 @@ export default function App() {
       segmentStartRef.current = null;
       setActiveTimerRunning(false);
       setTimerStartTime(null);
-    } else if (activeTaskId === baseTask.id) {
+    } else if (isActiveTarget) {
       lastFlushTimestampRef.current = null;
       segmentStartRef.current = null;
       setActiveTimerRunning(false);
       setTimerStartTime(null);
+    }
+
+    // Concluir encerra a sessao. Sem limpar `activeTaskId`, o mini-cronometro do
+    // canto inferior direito continua oferecendo "continuar estudando" (e o
+    // cabecalho mantem o relogio) numa tarefa que acabou de ser fechada.
+    if (isCompleted && isActiveTarget) {
+      setActiveTaskId(null);
+      setPomodoroPhase('foco');
+      setCompletedFocusBlocks(0);
+      setBreakAccumulatedSeconds(0);
+      setBreakTickElapsed(0);
+      setAccumulatedTimerSeconds(0);
+      setCurrentTickElapsed(0);
     }
 
     // A ocorrencia de uma serie volta para a tarefa-base: concluir o dia X

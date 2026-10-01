@@ -432,8 +432,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const subtasksTotalCount = (currentTask.subtasks || []).length;
   const subtasksProgressPercent = subtasksTotalCount > 0 ? Math.round((subtasksCompletedCount / subtasksTotalCount) * 100) : 0;
 
-  // Time calculations (inclui cronômetro ativo em tempo real se a tarefa estiver em foco)
-  const totalLiveSeconds = (currentTask.spentSeconds || 0) + (isTaskActiveTimer && activeTimerRunning ? activeTimerElapsed : 0);
+  // `spentSeconds` ja e reescrito a cada 10s durante o foco, entao ele e o total.
+  // Somar o `activeTimerElapsed` de novo contava o bloco corrente duas vezes.
+  const totalLiveSeconds = currentTask.spentSeconds || 0;
   const actualMinutes = Math.floor(totalLiveSeconds / 60);
   const estimatedMins = currentTask.estimatedMinutes || 90;
   const focusedFraction = estimatedMins > 0 ? totalLiveSeconds / (estimatedMins * 60) : 0;

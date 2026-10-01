@@ -118,6 +118,7 @@ export function generateRoadmapSteps(
 
 export const PomodoroRoadmap: React.FC<PomodoroRoadmapProps> = ({
   estimatedMinutes = 90,
+  spentSeconds = 0,
   completedFocusBlocks = 0,
   currentPhase = 'foco',
   isTimerRunning = false,
@@ -128,27 +129,46 @@ export const PomodoroRoadmap: React.FC<PomodoroRoadmapProps> = ({
   longBreakInterval = 4,
   className = '',
 }) => {
+  // `completedFocusBlocks` vive na memoria: um F5, um crash ou uma troca de
+  // tarefa o zeram. O tempo nao e assim — ele fica gravado em `spentSeconds`.
+  // Entao os blocos feitos sao o maior dos dois, e o roadmap nao pode voltar
+  // a zero depois de um F5 no meio do dia.
+  const blocksBySpent = focusMinutes > 0 ? Math.floor((spentSeconds / 60) / focusMinutes) : 0;
+  const doneBlocks = Math.max(completedFocusBlocks, blocksBySpent);
+
   const steps = generateRoadmapSteps(
     estimatedMinutes,
     focusMinutes,
     shortBreakMinutes,
     longBreakMinutes,
     longBreakInterval,
-    completedFocusBlocks,
+    doneBlocks,
     currentPhase,
     isTimerRunning
   );
 
-  const totalFocusPlanned = steps
-    .filter(s => s.type === 'focus')
-    .reduce((acc, s) => acc + s.durationMinutes, 0);
+  const focusSteps = steps.filter(s => s.type === 'focus');
+  const totalFocusPlanned = focusSteps.reduce((acc, s) => acc + s.durationMinutes, 0);
 
   const totalBreakPlanned = steps
     .filter(s => s.type === 'break')
     .reduce((acc, s) => acc + s.durationMinutes, 0);
 
-  const completedCount = steps.filter(s => s.status === 'completed').length;
-  const progressPercent = Math.min(100, Math.round((completedCount / steps.length) * 100));
+  // O progresso e de ESTUDO, nao de passos: uma pausa nao e "trabalho nao
+  // feito". Contando pausa no denominador, 3 blocos de 25 min numa meta de 90
+  // min apareciam como 43% (3 de 7 passos) em vez de 75%.
+  const doneFocus = focusSteps.filter(s => s.status === 'completed').length;
+
+  // O bloco ativo conta pela fracao ja percorrida, pausado ou nao: os 10 min de
+  // um bloco pausado continuam sendo 10 min de bloco feito.
+  const activeFocus = focusSteps.find(s => s.status === 'active');
+  const partialFocus = activeFocus && activeFocus.durationMinutes > 0
+    ? Math.min(1, (activeTimerElapsed / 60) / activeFocus.durationMinutes)
+    : 0;
+
+  const progressPercent = focusSteps.length > 0
+    ? Math.min(100, Math.round(((doneFocus + partialFocus) / focusSteps.length) * 100))
+    : 0;
 
   return (
     <div className={`flex flex-col gap-3.5 bg-[var(--surface)] border border-[var(--borda)] rounded-2xl p-4 shadow-sm ${className}`}>
@@ -160,7 +180,7 @@ export const PomodoroRoadmap: React.FC<PomodoroRoadmapProps> = ({
             <span>Jornada de Foco</span>
           </div>
           <div className="text-[11px] text-slate-500 font-medium mt-0.5">
-            {totalFocusPlanned}m estudo · {totalBreakPlanned}m pausas
+            {doneFocus}/{focusSteps.length} blocos · {totalFocusPlanned}m estudo · {totalBreakPlanned}m pausas
           </div>
         </div>
 

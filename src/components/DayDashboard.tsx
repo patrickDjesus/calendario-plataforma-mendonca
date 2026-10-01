@@ -161,9 +161,11 @@ export const DayDashboard: React.FC<DayDashboardProps> = ({
   // Goals calculations
   const completedCount = todayTasks.filter(t => t.completed).length;
   const totalCount = todayTasks.length;
-  const totalSecondsToday = todayTasks.reduce((acc, t) => {
-    return acc + (activeTask?.id === t.id ? activeTimerElapsed : t.spentSeconds);
-  }, 0);
+  // `spentSeconds` e a fonte da verdade e ja e reescrito a cada 10s durante o
+  // foco (App.persistFocusTime), entao ele mantem o total do dia atualizado.
+  // Substitui-lo pelo `activeTimerElapsed` — que e so o bloco POMODORO atual —
+  // fazia 1h10 acumuladas virarem 0.2h sempre que havia um bloco em andamento.
+  const totalSecondsToday = todayTasks.reduce((acc, t) => acc + (t.spentSeconds || 0), 0);
   const totalHoursToday = (totalSecondsToday / 3600).toFixed(1);
   const maxHours = studyModeConfig.maxDailyHours;
 
